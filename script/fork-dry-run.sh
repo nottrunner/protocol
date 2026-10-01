@@ -19,9 +19,10 @@ SENDER=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266   # Anvil public account #0 (a
 OUTDIR=deployments/fork-samples; mkdir -p "$OUTDIR"
 LOG="$OUTDIR/$CHAIN.log"
 
-anvil --fork-url "$URL" --fork-block-number "$PIN" --port "$PORT" --chain-id "$ID" >/dev/null 2>&1 &
+# --compute-units-per-second/--retries/--fork-retry-backoff keep public RPCs (e.g. Robinhood, HTTP 429) from failing the fork
+anvil --fork-url "$URL" --fork-block-number "$PIN" --port "$PORT" --chain-id "$ID" --compute-units-per-second 25 --retries 20 --fork-retry-backoff 1000 >/dev/null 2>&1 &
 APID=$!; trap 'kill $APID 2>/dev/null || true' EXIT
-for _ in $(seq 1 60); do cast chain-id --rpc-url "http://127.0.0.1:$PORT" >/dev/null 2>&1 && break; sleep 1; done
+for _ in $(seq 1 180); do cast chain-id --rpc-url "http://127.0.0.1:$PORT" >/dev/null 2>&1 && break; sleep 1; done
 cast rpc --rpc-url "http://127.0.0.1:$PORT" evm_mine >/dev/null 2>&1 || true   # avoids "Excess blob gas not set" on some forks
 
 forge build contracts >/dev/null
