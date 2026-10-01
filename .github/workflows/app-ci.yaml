@@ -35,5 +35,22 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - name: Install Foundry (anvil, for the E2E mock wallet signing test)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
       - run: npm test
+      # The E2E mock wallet (test-only, signs with a public Anvil key) must never be buildable for production.
+      - name: Guard rejects the mock wallet flag on a Vercel production build
+        run: |
+          if NEXT_PUBLIC_E2E_MOCK_WALLET=1 VERCEL_ENV=production npm run check:e2e-guard; then
+            echo "::error::E2E mock wallet guard did not fail for VERCEL_ENV=production"; exit 1
+          fi
       - run: npm run build
+      - name: Assert mock wallet connector and test key are absent from the default build
+        run: npm run verify:bundle -- absent
+      - name: Build with the mock wallet flag (QA build) and assert it is present
+        run: |
+          rm -rf .next
+          NEXT_PUBLIC_E2E_MOCK_WALLET=1 npm run build
+          npm run verify:bundle -- present
