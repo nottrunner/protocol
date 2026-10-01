@@ -31,9 +31,11 @@ Scripts: `npm run lint`, `npm run typecheck`, `npm test` (vitest), `npm run buil
 ## Configuration
 
 - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`: optional. Without it only injected + Coinbase wallets are offered.
-- `NEXT_PUBLIC_RPC_URL_{ETHEREUM,BASE,ARBITRUM,ROBINHOOD}`: optional RPC overrides. Defaults are public endpoints
-  (`ethereum-rpc.publicnode.com`, `mainnet.base.org`, `arb1.arbitrum.io/rpc`, `rpc.mainnet.chain.robinhood.com`) that
-  are rate-limited; use a dedicated provider in production.
+- `NEXT_PUBLIC_RPC_URL_{ETHEREUM,BASE,ROBINHOOD,ARBITRUM}`: optional per-chain RPC overrides. Defaults are public
+  endpoints (`ethereum-rpc.publicnode.com`, `mainnet.base.org`, `rpc.mainnet.chain.robinhood.com`,
+  `arb1.arbitrum.io/rpc`) that are rate-limited; use a dedicated provider in production. Unset or empty means
+  "use the default". Resolution lives in `src/config/rpc.ts` and feeds both the chain definitions and the wagmi
+  transports. See `.env.example`.
 - `NEXT_PUBLIC_FUND_DEPLOYER_{ETHEREUM,BASE,ARBITRUM,ROBINHOOD}`: FundDeployer address per chain.
 
 Everything `NEXT_PUBLIC_*` is shipped to the browser. Never put secrets in them.
@@ -41,6 +43,31 @@ Everything `NEXT_PUBLIC_*` is shipped to the browser. Never put secrets in them.
 Robinhood Chain is defined with `defineChain` in `src/config/chains.ts`: id 4663, ETH gas token, RPC
 `https://rpc.mainnet.chain.robinhood.com`, explorer `https://robinhoodchain.blockscout.com` (per
 docs.robinhood.com; `eth_chainId` on the RPC returns 0x1237).
+
+### Pointing a build at a local fork
+
+To run the app against a local [Anvil](https://book.getfoundry.sh/anvil/) fork (e.g. for QA), set the RPC var for
+the chain you are forking; no code changes are needed. Chain IDs are unchanged, so fork with the real chain's ID
+(Anvil's `--fork-url` keeps it).
+
+```bash
+anvil --fork-url "$MAINNET_RPC" --port 8545        # in another terminal
+
+cd app
+NEXT_PUBLIC_RPC_URL_ETHEREUM=http://127.0.0.1:8545 npm run dev
+# or put it in .env.local; for a production build:
+NEXT_PUBLIC_RPC_URL_ETHEREUM=http://127.0.0.1:8545 npm run build && npm start
+```
+
+Notes:
+
+- Use the matching var per chain (`..._BASE`, `..._ROBINHOOD`, `..._ARBITRUM`); chains left unset keep their public
+  defaults. Fork several chains on different ports (8545, 8546, ...) and set each var.
+- `NEXT_PUBLIC_*` values are inlined at **build** time: restart `npm run dev` / rebuild after changing them.
+- Values must be `http(s)` URLs; an invalid value throws on startup. Blank is treated as unset.
+- The URL is requested from the **browser**, so `127.0.0.1` means the machine running the browser. Your wallet must
+  also use the fork as its RPC for that chain (the app reads through its own transport, but wallet sends go through
+  the wallet's network RPC).
 
 ## Layout
 

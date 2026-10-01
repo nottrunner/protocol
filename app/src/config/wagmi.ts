@@ -2,15 +2,17 @@ import { connectorsForWallets, getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { coinbaseWallet, injectedWallet } from "@rainbow-me/rainbowkit/wallets";
 import { createConfig, http } from "wagmi";
 import { arbitrumChain, baseChain, ethereumChain, robinhoodChain, supportedChains } from "./chains";
+import { rpcUrls } from "./rpc";
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
 const appName = "Onchain Portfolio";
 
+// Endpoints come from NEXT_PUBLIC_RPC_URL_* (see ./rpc.ts), falling back to public defaults.
 const transports = {
-  [ethereumChain.id]: http(ethereumChain.rpcUrls.default.http[0]),
-  [baseChain.id]: http(baseChain.rpcUrls.default.http[0]),
-  [arbitrumChain.id]: http(arbitrumChain.rpcUrls.default.http[0]),
-  [robinhoodChain.id]: http(robinhoodChain.rpcUrls.default.http[0]),
+  [ethereumChain.id]: http(rpcUrls.ethereum),
+  [baseChain.id]: http(rpcUrls.base),
+  [arbitrumChain.id]: http(rpcUrls.arbitrum),
+  [robinhoodChain.id]: http(rpcUrls.robinhood),
 } as const;
 
 /**
