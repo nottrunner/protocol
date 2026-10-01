@@ -198,8 +198,9 @@ contract GMXV2LeverageTradingPositionLib is
     {
         address orderVaultAddress = __getOrderVaultAddress(_createOrderArgs.exchangeRouter);
 
-        IERC20(_createOrderArgs.addresses.initialCollateralToken)
-            .safeTransfer({_to: orderVaultAddress, _value: _createOrderArgs.numbers.initialCollateralDeltaAmount});
+        IERC20(_createOrderArgs.addresses.initialCollateralToken).safeTransfer({
+            _to: orderVaultAddress, _value: _createOrderArgs.numbers.initialCollateralDeltaAmount
+        });
 
         // if the collateral is the wrapped native token, the execution fee is already included in the initialCollateralDeltaAmount
         // related code: https://github.com/gmx-io/gmx-synthetics/blob/5173cbeb196ed5596373acd71c75a5c7a60a98f5/contracts/order/OrderUtils.sol#L81
@@ -223,8 +224,9 @@ contract GMXV2LeverageTradingPositionLib is
     {
         IERC20(address(WRAPPED_NATIVE_TOKEN))
             .safeTransfer({
-            _to: __getOrderVaultAddress(_createOrderArgs.exchangeRouter), _value: _createOrderArgs.numbers.executionFee
-        });
+                _to: __getOrderVaultAddress(_createOrderArgs.exchangeRouter),
+                _value: _createOrderArgs.numbers.executionFee
+            });
 
         IGMXV2ExchangeRouter(_createOrderArgs.exchangeRouter).createOrder(__getCreateOrderParams(_createOrderArgs));
     }
@@ -239,13 +241,12 @@ contract GMXV2LeverageTradingPositionLib is
         if (updateOrderArgs.executionFeeIncrease != 0) {
             IERC20(address(WRAPPED_NATIVE_TOKEN))
                 .safeTransfer({
-                _to: __getOrderVaultAddress(updateOrderArgs.exchangeRouter),
-                _value: updateOrderArgs.executionFeeIncrease
-            });
+                    _to: __getOrderVaultAddress(updateOrderArgs.exchangeRouter),
+                    _value: updateOrderArgs.executionFeeIncrease
+                });
         }
 
-        IGMXV2ExchangeRouter(updateOrderArgs.exchangeRouter)
-            .updateOrder({
+        IGMXV2ExchangeRouter(updateOrderArgs.exchangeRouter).updateOrder({
             _key: updateOrderArgs.key,
             _sizeDeltaUsd: updateOrderArgs.sizeDeltaUsd,
             _acceptablePrice: updateOrderArgs.acceptablePrice,
@@ -272,8 +273,9 @@ contract GMXV2LeverageTradingPositionLib is
 
         // if the order was a market increase order, transfer the collateral back to the vault
         if (order.numbers.orderType == IGMXV2Order.OrderType.MarketIncrease) {
-            IERC20(order.addresses.initialCollateralToken)
-                .safeTransfer({_to: msg.sender, _value: order.numbers.initialCollateralDeltaAmount});
+            IERC20(order.addresses.initialCollateralToken).safeTransfer({
+                _to: msg.sender, _value: order.numbers.initialCollateralDeltaAmount
+            });
         }
     }
 
@@ -285,8 +287,7 @@ contract GMXV2LeverageTradingPositionLib is
 
         __assertHandler(claimFundingFeesArgs.exchangeRouter);
 
-        IGMXV2ExchangeRouter(claimFundingFeesArgs.exchangeRouter)
-            .claimFundingFees({
+        IGMXV2ExchangeRouter(claimFundingFeesArgs.exchangeRouter).claimFundingFees({
             _markets: claimFundingFeesArgs.markets, _tokens: claimFundingFeesArgs.tokens, _receiver: msg.sender
         });
 
@@ -342,8 +343,7 @@ contract GMXV2LeverageTradingPositionLib is
 
         __assertHandler(claimCollateralArgs.exchangeRouter);
 
-        IGMXV2ExchangeRouter(claimCollateralArgs.exchangeRouter)
-            .claimCollateral({
+        IGMXV2ExchangeRouter(claimCollateralArgs.exchangeRouter).claimCollateral({
             _markets: claimCollateralArgs.markets,
             _tokens: claimCollateralArgs.tokens,
             _timeKeys: claimCollateralArgs.timeKeys,
@@ -456,8 +456,9 @@ contract GMXV2LeverageTradingPositionLib is
     /// @dev Helper to set the saved callback contract on the GMX ExchangeRouter, it will be called on liquidations and auto deleveraging
     function __setSavedCallbackContract(address _exchangeRouter, address _market) private {
         if (!marketToIsCallbackContractSet[_market]) {
-            IGMXV2ExchangeRouter(_exchangeRouter)
-                .setSavedCallbackContract({_market: _market, _callbackContract: address(this)});
+            IGMXV2ExchangeRouter(_exchangeRouter).setSavedCallbackContract({
+                _market: _market, _callbackContract: address(this)
+            });
 
             marketToIsCallbackContractSet[_market] = true;
 
