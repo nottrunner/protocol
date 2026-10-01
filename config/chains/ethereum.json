@@ -1,0 +1,99 @@
+{
+  "_readme": "No keys or RPC URLs with API keys belong in this file. 'verified' notes say how each address was checked (rpc = on-chain read on 2026-10-01; web = cited page; repo = repo test config). Omitted keys are unknown and read as address(0) by the deploy scripts; see 'todo'.",
+  "name": "ethereum",
+  "chainId": 1,
+  "rpc": {
+    "envVar": "ETHEREUM_NODE_MAINNET",
+    "foundryAlias": "ethereum",
+    "publicEndpointForReadsOnly": "https://ethereum-rpc.publicnode.com"
+  },
+  "tokens": {
+    "weth": {
+      "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "verified": "rpc: symbol WETH, 18 dec"
+    },
+    "usdc": {
+      "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "verified": "rpc: symbol USDC, 6 dec; address matches Circle's published native USDC (repo tests/utils/Constants.sol ETHEREUM_USDC)"
+    },
+    "mln": {
+      "address": "0xec67005c4E498Ec7f55E092bd1d35cbC47C91892",
+      "verified": "rpc: symbol MLN"
+    }
+  },
+  "denominationAsset": "usdc",
+  "release": {
+    "chainlinkStaleRateThresholdSeconds": 172800,
+    "chainlinkStaleRateThresholdNote": "2 x the longest heartbeat among registered feeds (USDC/ETH 86400s) = 172800s. Observed max round gap on the USDC/ETH feed over the last 25 rounds was 86424s, i.e. heartbeat + ~24s, so anything <= heartbeat would revert valuation.",
+    "vaultPositionsLimit": 20,
+    "gasRelay": {
+      "relayHub": "0x9e59Ea5333cD4f402dAc320a04fafA023fe3810D",
+      "trustedForwarder": "0xca57e5D6218AeB093D76372B51Ba355CfB3C6Cd0",
+      "verified": "repo: tests/bases/IntegrationTest.sol getDefaultMainnetConfig; rpc: code present at both (14411 / 5672 bytes). Identity not independently verified.",
+      "depositCooldown": 86400,
+      "depositMaxTotal": "1000000000000000000",
+      "feeMaxPercent": 10,
+      "relayFeeMaxBase": 0
+    }
+  },
+  "chainlink": {
+    "ethUsdAggregator": {
+      "address": "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",
+      "heartbeatSeconds": 3600,
+      "verified": "rpc: description 'ETH / USD', 8 dec, fresh answer; heartbeat from Chainlink reference-data-directory (3600s)"
+    },
+    "primitives": [
+      {
+        "symbol": "USDC",
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "aggregator": "0x986b5E1e1755e3C2440e960477f25201B0a8bbD4",
+        "rateAsset": "ETH",
+        "heartbeatSeconds": 86400,
+        "verified": "rpc: description 'USDC / ETH'; heartbeat from Chainlink directory (86400s). Quoted in ETH so rateAsset=ETH"
+      }
+    ]
+  },
+  "routers": {
+    "uniswapV3SwapRouter": {
+      "address": "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+      "verified": "rpc: code present, factory() == v3 factory, original exactInput selector c04b8d59 present"
+    },
+    "uniswapV3SwapRouter02": {
+      "address": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+      "verified": "rpc: code present, factory()/WETH9() match, SwapRouter02 selector b858183f present"
+    },
+    "uniswapV3Factory": {
+      "address": "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+      "verified": "rpc: returned by router.factory()"
+    },
+    "paraSwapAugustusV6": {
+      "address": "0x6a000f20005980200259b80c5102003040001068",
+      "verified": "rpc: 24562 bytes of code; address per Velora docs https://www.velora.xyz/docs/resources/chains-and-contracts"
+    },
+    "oneInchV5": {
+      "address": "0x1111111254EEB25477B68fb85Ed929f73A960582",
+      "verified": "rpc: code present (22484 bytes)"
+    },
+    "zeroExV4Exchange": {
+      "address": "0xDef1C0ded9bec7F1a1670819833240f027b25EfF",
+      "verified": "rpc: code present (1229 bytes); address from research/repo adapter docs"
+    }
+  },
+  "features": {
+    "vaultCreation": true,
+    "depositRedeem": true,
+    "swaps": true,
+    "uniswapV3Adapter": true,
+    "paraSwapV6Adapter": true,
+    "oneInchV5Adapter": true,
+    "zeroExV4Adapter": true,
+    "externalPositions": true,
+    "gasRelay": true,
+    "protocolFeeBuyback": true
+  },
+  "todo": [
+    "Decide reuse-vs-fresh (see script/README.md): Enzyme live FundDeployer is 0x4f1C53F0...6360 (repo tests/utils/core/deployment/V4ReleaseContracts.sol).",
+    "Production stale-rate threshold is not known for Enzyme's live deployment; value here is derived from heartbeats only.",
+    "Chainlink feeds for further assets are not registered by the script (core stack only)."
+  ]
+}

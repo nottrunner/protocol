@@ -1,0 +1,97 @@
+{
+  "_readme": "No keys or RPC URLs with API keys belong in this file. 'verified' notes say how each address was checked (rpc = on-chain read on 2026-10-01; web = cited page; repo = repo test config). Omitted keys are unknown and read as address(0) by the deploy scripts; see 'todo'.",
+  "name": "robinhood",
+  "chainId": 4663,
+  "rpc": {
+    "envVar": "ETHEREUM_NODE_ROBINHOOD",
+    "foundryAlias": "robinhood",
+    "publicEndpointForReadsOnly": "https://rpc.mainnet.chain.robinhood.com"
+  },
+  "tokens": {
+    "weth": {
+      "address": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+      "verified": "rpc: symbol WETH, 18 dec; also WETH9() of SwapRouter02; docs https://docs.robinhood.com/chain/contracts/"
+    },
+    "usdg": {
+      "address": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+      "verified": "rpc: name 'Global Dollar', symbol USDG, 6 dec; docs https://docs.robinhood.com/chain/contracts/"
+    }
+  },
+  "denominationAsset": "usdg",
+  "release": {
+    "chainlinkStaleRateThresholdSeconds": 172800,
+    "chainlinkStaleRateThresholdNote": "All registered feeds (USDG/USD, ETH/USD) have an 86400s heartbeat. The USDG/USD feed was observed updating with a 86430s gap (heartbeat + 30s), so a threshold equal to the heartbeat would revert valuation: 2 x 86400 = 172800s tolerates one fully missed heartbeat. Only non-equity feeds are registered, so 24/5 equity staleness does not apply. Trade-off: a depegged/halted stablecoin feed can be up to 48h stale before valuation reverts; the 0.5% deviation trigger bounds normal drift.",
+    "vaultPositionsLimit": 20,
+    "gasRelay": {
+      "verified": "no GSN on Robinhood Chain known; gas relay disabled",
+      "depositCooldown": 86400,
+      "depositMaxTotal": "1000000000000000000",
+      "feeMaxPercent": 10,
+      "relayFeeMaxBase": 0
+    }
+  },
+  "chainlink": {
+    "ethUsdAggregator": {
+      "address": "0x78F3556b67E17Df817D51Ef5a990cDaF09E8d3A9",
+      "heartbeatSeconds": 86400,
+      "verified": "rpc: description 'ETH / USD', 8 dec, fresh answer; heartbeat 86400s per Chainlink directory JSON; observed max gap over last 30 rounds 32560s"
+    },
+    "primitives": [
+      {
+        "symbol": "USDG",
+        "token": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+        "aggregator": "0x61B7e5650328764B076A108EFF5fa7282a1B9aD2",
+        "rateAsset": "USD",
+        "heartbeatSeconds": 86400,
+        "verified": "rpc: description 'USDG / USD', 8 dec, fresh answer; heartbeat 86400s per Chainlink directory JSON; observed max gap over last 30 rounds 86430s"
+      }
+    ]
+  },
+  "routers": {
+    "uniswapV3SwapRouter02": {
+      "address": "0xCaf681A66D020601342297493863e78c959E5cB2",
+      "verified": "rpc: code present (24497 bytes), factory()/WETH9() read, selector b858183f present and c04b8d59 absent. Address per Uniswap docs https://developers.uniswap.org/docs/protocols/v3/deployments/v3-robinhood-chain-deployments"
+    },
+    "uniswapV3Factory": {
+      "address": "0x1f7d7550B1b028f7571E69A784071F0205FD2EfA",
+      "verified": "rpc: returned by router.factory()"
+    },
+    "paraSwapAugustusV6": {
+      "address": "0x6a000f20005980200259b80c5102003040001068",
+      "verified": "rpc: 24562 bytes of code; address per Velora docs"
+    },
+    "oneInchV6": {
+      "address": "0x111111125421cA6dc452d289314280a0f8842A65",
+      "verified": "rpc: code present (24574 bytes). The repo has no v6 adapter"
+    }
+  },
+  "features": {
+    "vaultCreation": true,
+    "depositRedeem": true,
+    "swaps": false,
+    "uniswapV3Adapter": false,
+    "paraSwapV6Adapter": false,
+    "oneInchV5Adapter": false,
+    "zeroExV4Adapter": false,
+    "externalPositions": false,
+    "gasRelay": false,
+    "protocolFeeBuyback": false,
+    "phase": 1,
+    "phaseNote": "Phase 1 = vault creation + deposit/redeem only, USDG denomination. Phase 2 = ParaSwap v6 behind AllowedAdapters. Phase 3 = patched UniswapV3Adapter."
+  },
+  "excludedTokens": [
+    {
+      "label": "USDC",
+      "address": "0x378F906eAD242F0C3aa9ed45AA07612A2C088030",
+      "reason": "On-chain name is 'Universal Stable Digital Coin', 18 decimals, supply exactly 1e9. NOT Circle USDC. Never use as denomination asset or register as USDC."
+    }
+  ],
+  "todo": [
+    "MLN token: none known on Robinhood Chain. Deploy script passes address(0) for MLN token and MLN burner (constructors only store it; I read the source, no zero check). Protocol-fee buyback is unusable; confirm or deploy a dummy burnable token.",
+    "GSN relay hub / trusted forwarder: none known, gas relay disabled.",
+    "Other stablecoin feeds exist (USDT/USD 0xbf3550B6fAe1671da7C238Af12e03Ac586BEf3B1, USDC/USD 0x9e6f4605992a899eE2999999F3Ec80C41F452546) and read fine, but the matching token addresses (USDT, Circle USDC) were not verified, so they are NOT registered.",
+    "Arbitrum-bridged USDC 0x80e0e24718dbFcad49ECAA6F1e6C89A190586cA8 (name 'USD Coin', 6 dec) is dust per third-party page and not identity-verified beyond name: NOT registered.",
+    "Equity/ETF feeds and stock tokens: out of scope (PM decision 2026-10-01).",
+    "No L2 sequencer uptime feed exists for Robinhood Chain."
+  ]
+}

@@ -1,0 +1,147 @@
+{
+  "_WARNING": "**NEVER use these accounts or this mnemonic on any network where real funds exist. The private keys are PUBLIC (Anvil's well-known test mnemonic). Anything sent to these addresses on a real chain is stolen within seconds.**",
+  "anvilAccounts": {
+    "note": "Anvil/Hardhat default public test accounts, derived from Anvil's well-known public test mnemonic (the standard 'test ... junk' phrase documented by Foundry). Addresses only; no private keys are stored in this file. Derive keys locally with `anvil` output or `cast wallet address --mnemonic ... --mnemonic-index N`.",
+    "mnemonicIsPublic": true,
+    "derivationPath": "m/44'/60'/0'/0/N",
+    "accounts": [
+      {
+        "index": 0,
+        "address": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        "role": "deployer / Dispatcher owner (script --sender)"
+      },
+      {
+        "index": 1,
+        "address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "role": "QA vault manager"
+      },
+      {
+        "index": 2,
+        "address": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+        "role": "QA depositor A"
+      },
+      {
+        "index": 3,
+        "address": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+        "role": "QA depositor B"
+      },
+      {
+        "index": 4,
+        "address": "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65",
+        "role": "spare"
+      },
+      {
+        "index": 5,
+        "address": "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc",
+        "role": "spare"
+      },
+      {
+        "index": 6,
+        "address": "0x976EA74026E726554dB657fA54763abd0C3a0aa9",
+        "role": "spare"
+      },
+      {
+        "index": 7,
+        "address": "0x14dC79964da2C08b23698B3D3cc7Ca32193d9955",
+        "role": "spare"
+      },
+      {
+        "index": 8,
+        "address": "0x23618e81E3f5cdF7f54C3d65f7FBc0aBf5B21E8f",
+        "role": "spare"
+      },
+      {
+        "index": 9,
+        "address": "0xa0Ee7A142d267C1f36714E4a8F75612F20a79720",
+        "role": "spare"
+      }
+    ]
+  },
+  "warningRepeat": "**WARNING: Fork-funded test accounts only. Do not fund these addresses on mainnet, Base, Arbitrum One, or Robinhood Chain. Do not paste real keys into this repo.**",
+  "chains": [
+    {
+      "chain": "ethereum",
+      "chainId": 1,
+      "fork": {
+        "source": "anvil --fork-url $ETHEREUM_NODE_MAINNET",
+        "publicReadOnlyEndpoint": "https://ethereum-rpc.publicnode.com",
+        "suggestedLocalPort": 8601,
+        "localRpc": "http://127.0.0.1:8601",
+        "anvilCommand": "anvil --fork-url $ETHEREUM_NODE_MAINNET --port 8601 --chain-id 1"
+      },
+      "fundedOn": "local anvil fork of ethereum only (state lives in the anvil process; nothing is sent to the real network)",
+      "fundingSteps": [
+        "1. Start the fork: anvil --fork-url $ETHEREUM_NODE_MAINNET --port 8601 --chain-id 1",
+        "2. Mine one block once (avoids 'Excess blob gas not set' on some forks): cast rpc --rpc-url http://127.0.0.1:8601 evm_mine",
+        "3. Native ETH: cast rpc --rpc-url http://127.0.0.1:8601 anvil_setBalance <account> 0x56BC75E2D63100000   # 100 ETH",
+        "4a. USDC: script/fund-anvil.sh http://127.0.0.1:8601 <account> 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48 1000000000   # 1000 USDC (6 dec); verified works, slot 9",
+        "4b. WETH: script/fund-anvil.sh http://127.0.0.1:8601 <account> 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2 1000000000000000000   # 1 WETH; verified works, slot 3 (or call WETH.deposit{value})",
+        "Foundry tests/scripts alternative: deal(token, account, amount) from forge-std StdCheats.",
+        "Denomination asset for QA: USDC. Deployed addresses are reproducible with script/README.md (deterministic nonce-based CREATE from the sender)."
+      ]
+    },
+    {
+      "chain": "base",
+      "chainId": 8453,
+      "fork": {
+        "source": "anvil --fork-url $ETHEREUM_NODE_BASE",
+        "publicReadOnlyEndpoint": "https://base-rpc.publicnode.com",
+        "suggestedLocalPort": 8602,
+        "localRpc": "http://127.0.0.1:8602",
+        "anvilCommand": "anvil --fork-url $ETHEREUM_NODE_BASE --port 8602 --chain-id 8453"
+      },
+      "fundedOn": "local anvil fork of base only (state lives in the anvil process; nothing is sent to the real network)",
+      "fundingSteps": [
+        "1. Start the fork: anvil --fork-url $ETHEREUM_NODE_BASE --port 8602 --chain-id 8453",
+        "2. Mine one block once (avoids 'Excess blob gas not set' on some forks): cast rpc --rpc-url http://127.0.0.1:8602 evm_mine",
+        "3. Native ETH: cast rpc --rpc-url http://127.0.0.1:8602 anvil_setBalance <account> 0x56BC75E2D63100000   # 100 ETH",
+        "4a. USDC: script/fund-anvil.sh http://127.0.0.1:8602 <account> 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 1000000000   # 1000 USDC; verified works, slot 9",
+        "4b. WETH: send ETH to 0x4200000000000000000000000000000000000006 via deposit() (cast send --unlocked --from <account> <weth> 'deposit()' --value 1ether)",
+        "Foundry tests/scripts alternative: deal(token, account, amount) from forge-std StdCheats.",
+        "Swap (AC-4) is BLOCKED on Base until UniswapV3Adapter is patched for SwapRouter02 (config features.uniswapV3Adapter=false)."
+      ]
+    },
+    {
+      "chain": "arbitrum",
+      "chainId": 42161,
+      "fork": {
+        "source": "anvil --fork-url $ETHEREUM_NODE_ARBITRUM",
+        "publicReadOnlyEndpoint": "https://arb1.arbitrum.io/rpc",
+        "suggestedLocalPort": 8603,
+        "localRpc": "http://127.0.0.1:8603",
+        "anvilCommand": "anvil --fork-url $ETHEREUM_NODE_ARBITRUM --port 8603 --chain-id 42161"
+      },
+      "fundedOn": "local anvil fork of arbitrum only (state lives in the anvil process; nothing is sent to the real network)",
+      "fundingSteps": [
+        "1. Start the fork: anvil --fork-url $ETHEREUM_NODE_ARBITRUM --port 8603 --chain-id 42161",
+        "2. Mine one block once (avoids 'Excess blob gas not set' on some forks): cast rpc --rpc-url http://127.0.0.1:8603 evm_mine",
+        "3. Native ETH: cast rpc --rpc-url http://127.0.0.1:8603 anvil_setBalance <account> 0x56BC75E2D63100000   # 100 ETH",
+        "4a. USDC: script/fund-anvil.sh http://127.0.0.1:8603 <account> 0xaf88d065e77c8cC2239327C5EDb3A432268e5831 1000000000   # 1000 USDC; verified works, slot 9 (run step 2 first)",
+        "4b. WETH: cast send --unlocked --from <account> 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1 'deposit()' --value 1ether",
+        "Foundry tests/scripts alternative: deal(token, account, amount) from forge-std StdCheats."
+      ]
+    },
+    {
+      "chain": "robinhood",
+      "chainId": 4663,
+      "fork": {
+        "source": "anvil --fork-url $ETHEREUM_NODE_ROBINHOOD",
+        "publicReadOnlyEndpoint": "https://rpc.mainnet.chain.robinhood.com",
+        "suggestedLocalPort": 8645,
+        "localRpc": "http://127.0.0.1:8645",
+        "anvilCommand": "anvil --fork-url $ETHEREUM_NODE_ROBINHOOD --port 8645 --chain-id 4663"
+      },
+      "fundedOn": "local anvil fork of robinhood only (state lives in the anvil process; nothing is sent to the real network)",
+      "fundingSteps": [
+        "1. Start the fork: anvil --fork-url $ETHEREUM_NODE_ROBINHOOD --port 8645 --chain-id 4663",
+        "2. Mine one block once (avoids 'Excess blob gas not set' on some forks): cast rpc --rpc-url http://127.0.0.1:8645 evm_mine",
+        "3. Native ETH: cast rpc --rpc-url http://127.0.0.1:8645 anvil_setBalance <account> 0x56BC75E2D63100000   # 100 ETH",
+        "4a. USDG (denomination asset, 6 dec): script/fund-anvil.sh http://127.0.0.1:8645 <account> 0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168 1000000000   # 1000 USDG; verified works, slot 1 (run step 2 first)",
+        "4b. WETH (aeWETH): the storage-probe helper did NOT find a balances slot; wrap instead: cast send --unlocked --from <account> 0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73 'deposit()' --value 1ether (not tested)",
+        "Foundry tests/scripts alternative: deal(token, account, amount) from forge-std StdCheats.",
+        "Do NOT fund or use the token labelled 'USDC' at 0x378F906eAD242F0C3aa9ed45AA07612A2C088030: it is 'Universal Stable Digital Coin' (18 dec), not Circle USDC.",
+        "Phase 1 only: create vault, deposit, redeem (AC-1,2,3,5,6). Swaps disabled."
+      ]
+    }
+  ]
+}

@@ -19,3 +19,4 @@ cache/
 # Ignore internal interfaces.
 tests/interfaces/internal/*.sol
 tests/interfaces/internal/*.abi.json
+broadcast/
