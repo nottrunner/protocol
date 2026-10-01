@@ -115,6 +115,68 @@ contract DeployCore is Script {
 
         sanityCheck(c, p_, r_);
         logAddresses(c, p_, r_);
+        writeDeployment(c, p_, r_);
+    }
+
+    /// @dev Writes the addresses + provenance to a JSON file. Safe by default: nothing is written unless the env
+    /// var RUN_KIND is set. Metadata comes from env (set by script/fork-dry-run.sh): RUN_KIND, GIT_SHA, GIT_DIRTY,
+    /// CONFIG_SHA256, FORK_BLOCK, OUTPUT_PATH (default deployments/<chain>.json only when RUN_KIND=broadcast).
+    function writeDeployment(Cfg memory _c, Persistent memory _p, Release memory _r) internal {
+        string memory kind = vm.envOr("RUN_KIND", string(""));
+        if (bytes(kind).length == 0) {
+            console2.log("RUN_KIND not set: deployments/*.json not written");
+            return;
+        }
+        string memory defaultPath = string.concat("deployments/", _c.chain, ".json");
+        string memory path = vm.envOr("OUTPUT_PATH", defaultPath);
+        require(
+            keccak256(bytes(kind)) == keccak256("broadcast") || keccak256(bytes(path)) != keccak256(bytes(defaultPath)),
+            "DeployCore: only RUN_KIND=broadcast may write deployments/<chain>.json"
+        );
+
+        string memory a = "addresses";
+        vm.serializeAddress(a, "dispatcher", _p.dispatcher);
+        vm.serializeAddress(a, "addressListRegistry", _p.addressListRegistry);
+        vm.serializeAddress(a, "externalPositionFactory", _p.externalPositionFactory);
+        vm.serializeAddress(a, "globalConfigProxy", _p.globalConfigProxy);
+        vm.serializeAddress(a, "protocolFeeReserveProxy", _p.protocolFeeReserveProxy);
+        vm.serializeAddress(a, "uintListRegistry", _p.uintListRegistry);
+        vm.serializeAddress(a, "fundValueCalculatorRouter", _p.fundValueCalculatorRouter);
+        vm.serializeAddress(a, "gasRelayPaymasterFactory", _r.gasRelayPaymasterFactory);
+        vm.serializeAddress(a, "fundDeployer", _r.fundDeployer);
+        vm.serializeAddress(a, "protocolFeeTracker", _r.protocolFeeTracker);
+        vm.serializeAddress(a, "valueInterpreter", _r.valueInterpreter);
+        vm.serializeAddress(a, "policyManager", _r.policyManager);
+        vm.serializeAddress(a, "externalPositionManager", _r.externalPositionManager);
+        vm.serializeAddress(a, "feeManager", _r.feeManager);
+        vm.serializeAddress(a, "integrationManager", _r.integrationManager);
+        vm.serializeAddress(a, "comptrollerLib", _r.comptrollerLib);
+        vm.serializeAddress(a, "vaultLib", _r.vaultLib);
+        string memory addrJson = vm.serializeAddress(a, "fundValueCalculator", _r.fundValueCalculator);
+
+        string memory o = "deployment";
+        bool isBroadcast = keccak256(bytes(kind)) == keccak256("broadcast");
+        vm.serializeString(
+            o,
+            "label",
+            isBroadcast
+                ? "REAL BROADCAST DEPLOYMENT"
+                : "ANVIL FORK DRY RUN - NOT A MAINNET DEPLOYMENT. Addresses exist only on a throwaway local fork."
+        );
+        vm.serializeString(o, "runKind", kind);
+        vm.serializeString(o, "chain", _c.chain);
+        vm.serializeUint(o, "chainId", block.chainid);
+        vm.serializeUint(o, "blockNumberAtDeploy", block.number);
+        vm.serializeUint(o, "forkBlock", vm.envOr("FORK_BLOCK", uint256(0)));
+        vm.serializeUint(o, "blockTimestampAtDeploy", block.timestamp);
+        vm.serializeAddress(o, "deployer", msg.sender);
+        vm.serializeUint(o, "chainlinkStaleRateThresholdSeconds", _c.staleRateThreshold);
+        vm.serializeString(o, "scriptCommit", vm.envOr("GIT_SHA", string("unknown")));
+        vm.serializeString(o, "scriptTreeDirty", vm.envOr("GIT_DIRTY", string("unknown")));
+        vm.serializeString(o, "configSha256", vm.envOr("CONFIG_SHA256", string("unknown")));
+        string memory out = vm.serializeString(o, "addresses", addrJson);
+        vm.writeJson(out, path);
+        console2.log("wrote", path);
     }
 
     // CONFIG

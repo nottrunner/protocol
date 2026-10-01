@@ -24,7 +24,7 @@
   "denominationAsset": "usdc",
   "release": {
     "chainlinkStaleRateThresholdSeconds": 172800,
-    "chainlinkStaleRateThresholdNote": "2 x the longest heartbeat among registered feeds (USDC/ETH 86400s) = 172800s. Observed max round gap on the USDC/ETH feed over the last 25 rounds was 86424s, i.e. heartbeat + ~24s, so anything <= heartbeat would revert valuation.",
+    "chainlinkStaleRateThresholdNote": "172800s (48h) sized for the SLOWEST registered feed (global threshold, one immutable value per ValueInterpreter). Slowest = USDC/ETH: heartbeat 86400s, max observed gap 97800s. Just above the heartbeat (e.g. 90000s) would already have reverted valuation on the observed 97800s gap; 172800 = 2x heartbeat, 1.77x the max observed gap, so one missed heartbeat is tolerated. ETH/USD (heartbeat 3600s, max observed 15996s) is far inside it. Trade-off: too LOW a threshold reverts valid rates and freezes deposits/redeems/valuation (fails closed); too HIGH accepts stale prices, here up to 48h for the ETH/USD feed (heartbeat 1h) because the threshold is global. Accepted because the vault denomination is a USD stablecoin and the 0.5% deviation trigger keeps ETH/USD fresh in practice. Values re-checked 2026-10-01.",
     "vaultPositionsLimit": 20,
     "gasRelay": {
       "relayHub": "0x9e59Ea5333cD4f402dAc320a04fafA023fe3810D",
@@ -40,7 +40,9 @@
     "ethUsdAggregator": {
       "address": "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",
       "heartbeatSeconds": 3600,
-      "verified": "rpc: description 'ETH / USD', 8 dec, fresh answer; heartbeat from Chainlink reference-data-directory (3600s)"
+      "verified": "rpc: description 'ETH / USD', 8 dec, fresh answer; heartbeat from Chainlink reference-data-directory (3600s)",
+      "observedMaxGapSeconds": 15996,
+      "observation": "264 consecutive rounds (~222h) read via eth_call on 2026-10-01 (ET); heartbeat 3600s per Chainlink reference-data-directory JSON; deviation 0.5%"
     },
     "primitives": [
       {
@@ -49,7 +51,9 @@
         "aggregator": "0x986b5E1e1755e3C2440e960477f25201B0a8bbD4",
         "rateAsset": "ETH",
         "heartbeatSeconds": 86400,
-        "verified": "rpc: description 'USDC / ETH'; heartbeat from Chainlink directory (86400s). Quoted in ETH so rateAsset=ETH"
+        "verified": "rpc: description 'USDC / ETH'; heartbeat from Chainlink directory (86400s). Quoted in ETH so rateAsset=ETH",
+        "observedMaxGapSeconds": 97800,
+        "observation": "273 rounds (~1289h): median gap 7524s, max 97800s (> the 86400s heartbeat, i.e. a feed can update later than its nominal heartbeat); heartbeat 86400s, deviation 1% per Chainlink reference-data-directory JSON"
       }
     ]
   },

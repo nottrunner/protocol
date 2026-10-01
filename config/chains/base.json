@@ -24,7 +24,7 @@
   "denominationAsset": "usdc",
   "release": {
     "chainlinkStaleRateThresholdSeconds": 172800,
-    "chainlinkStaleRateThresholdNote": "2 x the longest heartbeat among registered feeds (USDC/USD 86400s) = 172800s. The ETH/USD aggregator heartbeat was not found in the Chainlink directory; observed gaps (<=1232s) are well inside the threshold.",
+    "chainlinkStaleRateThresholdNote": "172800s (48h) sized for the SLOWEST registered feed. Slowest = USDC/USD: heartbeat 86400s, max observed gap 86490s (it updates at ~heartbeat+30..90s, so a threshold only just above the heartbeat reverts whenever an update is a little late). 172800 = 2x heartbeat tolerates one fully missed update. Base ETH/USD: heartbeat UNVERIFIED (not in the Chainlink directory); observed max gap 1232s over 300 rounds, far inside the threshold, but if Chainlink's real heartbeat were longer than 48h valuation would revert (fails closed). Trade-off: too LOW reverts valid rates and freezes the vault; too HIGH accepts stale prices (up to 48h for ETH/USD because the threshold is global). Values re-checked 2026-10-01.",
     "vaultPositionsLimit": 20,
     "gasRelay": {
       "verified": "repo config leaves hub/forwarder as address(0) TODO on Base; gas relay disabled",
@@ -37,7 +37,11 @@
   "chainlink": {
     "ethUsdAggregator": {
       "address": "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70",
-      "verified": "rpc: description 'ETH / USD', 8 dec, fresh answer. Heartbeat NOT confirmed in Chainlink directory (observed max gap 1232s over 15 rounds)"
+      "verified": "rpc: description 'ETH / USD', 8 dec, fresh answer. Heartbeat NOT confirmed in Chainlink directory (observed max gap 1232s over 15 rounds)",
+      "heartbeatSeconds": null,
+      "heartbeatVerified": false,
+      "observedMaxGapSeconds": 1232,
+      "observation": "UNVERIFIED heartbeat: this proxy is not in the Chainlink directory JSON for Base. 300 rounds (~46h) read on-chain: median gap 390s, max 1232s."
     },
     "primitives": [
       {
@@ -46,7 +50,9 @@
         "aggregator": "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B",
         "rateAsset": "USD",
         "heartbeatSeconds": 86400,
-        "verified": "rpc: description 'USDC / USD'; heartbeat 86400s per Chainlink directory (observed max round gap 86428s)"
+        "verified": "rpc: description 'USDC / USD'; heartbeat 86400s per Chainlink directory (observed max round gap 86428s)",
+        "observedMaxGapSeconds": 86490,
+        "observation": "40 rounds (~956h): median gap 86418s, max 86490s (heartbeat 86400s, deviation 0.3% per Chainlink reference-data-directory JSON)"
       }
     ],
     "sequencerUptimeFeed": {

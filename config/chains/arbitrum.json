@@ -24,7 +24,7 @@
   "denominationAsset": "usdc",
   "release": {
     "chainlinkStaleRateThresholdSeconds": 3600,
-    "chainlinkStaleRateThresholdNote": "Longest registered heartbeat is ETH/USD at 1755s; 2 x 1755 = 3510s, rounded up to 3600s. The USDC/USD feed has a 255s heartbeat (observed max gap 271s), well inside. NOTE: the threshold is global, so any later primitive with a heartbeat > ~1h (e.g. a 24h feed) needs this raised first.",
+    "chainlinkStaleRateThresholdNote": "3600s (1h) KEPT after re-check: sized for the SLOWEST registered feed = ETH/USD, heartbeat 1755s (directory + Chainlink docs page; max observed gap 630s over 300 rounds). USDC/USD heartbeat 255s (max observed 330s). 3600 = ~2x the slowest heartbeat and ~5.7x the max observed gap. Trade-off: lower reverts valid rates; higher accepts staler prices, and Arbitrum feeds update often so a tight bound is cheap. RISK: Chainlink changed these heartbeats in April 2026, so a future heartbeat increase above ~1800s would make valuation revert (fails closed) and the threshold, being immutable per ValueInterpreter, would need a redeploy. If the team prefers headroom over tightness, 7200s is the alternative. Any later Arbitrum primitive with a heartbeat > ~1800s (e.g. a 24h feed) requires raising this before deploy.",
     "vaultPositionsLimit": 20,
     "gasRelay": {
       "verified": "repo config leaves hub/forwarder as address(0) TODO on Arbitrum; gas relay disabled",
@@ -38,7 +38,9 @@
     "ethUsdAggregator": {
       "address": "0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612",
       "heartbeatSeconds": 1755,
-      "verified": "rpc: description 'ETH / USD', 8 dec, fresh answer; heartbeat 1755s per Chainlink directory (observed max gap 450s)"
+      "verified": "rpc: description 'ETH / USD', 8 dec, fresh answer; heartbeat 1755s per Chainlink directory (observed max gap 450s)",
+      "observedMaxGapSeconds": 630,
+      "observation": "Heartbeat 1755s, deviation 0.05%: Chainlink directory JSON AND the Chainlink docs page for Arbitrum feeds (docs.chain.link price-feeds addresses?network=arbitrum) both say 1755; Chainlink changelog 2026-04-27 lowered heartbeat/deviation on Arbitrum ETH/USD, USDC/USD etc. 300 rounds (~7.6h) on-chain: median 60s, max 630s. A third-party guide claiming a 24h heartbeat for Arbitrum ETH/USD is contradicted by all of the above."
     },
     "primitives": [
       {
@@ -47,7 +49,9 @@
         "aggregator": "0x50834F3163758fcC1Df9973b6e91f0F0F0434aD3",
         "rateAsset": "USD",
         "heartbeatSeconds": 255,
-        "verified": "rpc: description 'USDC / USD'; heartbeat 255s per Chainlink directory (observed max round gap 271s over 25 rounds)"
+        "verified": "rpc: description 'USDC / USD'; heartbeat 255s per Chainlink directory (observed max round gap 271s over 25 rounds)",
+        "observedMaxGapSeconds": 330,
+        "observation": "Heartbeat 255s, deviation 0.1% (directory JSON + docs page, lowered per the 2026-04-27 changelog). 300 rounds (~22.5h): median 270s, max 330s."
       }
     ],
     "sequencerUptimeFeed": {
