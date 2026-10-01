@@ -1,0 +1,39 @@
+{
+  "addresses": {
+    "addressListRegistry": "0xCF7A04ECcF4485093b1b4ebA5Ff39901c5a8f2C3",
+    "comptrollerLib": "0xa13318684281a820304C164427396385C306d870",
+    "dispatcher": "0x5159Dd137BE4A2A26955908cD916abd3B1fDc2C1",
+    "externalPositionFactory": "0xCE9a1f44156c84F1c1E3b0685E15e23c51bb6d0A",
+    "externalPositionManager": "0x37c6D38D67a15C07Ff636CFBCE99987fF9f1F24a",
+    "feeManager": "0xbDAB27D1903da4e18B0D1BE873E18924514E52eC",
+    "fundDeployer": "0xdf207Ba73Ccd4B517bd126728296298Fef3099AF",
+    "fundValueCalculator": "0xE5e41d59f85d4B2E70aB5BD048d96D556930B61a",
+    "fundValueCalculatorRouter": "0xE2b34D2B8Cba586aC4e3052233A460E39fF212E8",
+    "gasRelayPaymasterFactory": "0x0a5fF8eAE2104805E18a2F3646776d577Fc9Cf26",
+    "globalConfigProxy": "0x9564cec2C8b2Da954D2F0B1D4A777978759B945c",
+    "integrationManager": "0xA3DF7367c5010A3f02e6C65f57dd080D7C129BDf",
+    "policyManager": "0x35693AB7715cb9E50513Ef1cE2177918532806BF",
+    "protocolFeeReserveProxy": "0x5Ae1f4bB68f8EAC39CFDbdFdA2b7344Ccbd80fAf",
+    "protocolFeeTracker": "0xb97C59331F89a852Ae21aee215Da28820c533649",
+    "uintListRegistry": "0x1e493b995b2b9Afed46e60bd163d12F23CF628ba",
+    "valueInterpreter": "0x52d7728fE87826FfF51b21b303e2FF7cB04F6Aec",
+    "vaultLib": "0xa4aE41b9bB88Eb03048EA3bb71AB32A62ebC7188"
+  },
+  "blockNumberAtDeploy": 77673197,
+  "blockTimestampAtDeploy": 1790887777,
+  "chain": "robinhood",
+  "chainId": 4663,
+  "chainlinkStaleRateThresholdSeconds": 172800,
+  "configSha256": "140dbe1a36fc284e475ca87041d0093fed31156330da255d435a6763765e628c",
+  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "forkBlock": 77673196,
+  "label": "ANVIL FORK DRY RUN - NOT A MAINNET DEPLOYMENT. Addresses exist only on a throwaway local fork.",
+  "runKind": "anvil-fork-dry-run",
+  "scriptCommit": "c0dc05c5a72f707fa90053c1a4a37ec70c53a258",
+  "scriptTreeDirty": "false",
+  "log": {
+    "path": "deployments/fork-samples/robinhood.log",
+    "sha256": "736515cb2052feb0eea2848697b8b50c6b46bcf0e6151d711aebfc24580a5594"
+  },
+  "reproduce": "script/fork-dry-run.sh robinhood 77673196  (same commit + same fork block + same sender => same addresses)"
+}

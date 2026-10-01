@@ -1,0 +1,39 @@
+{
+  "addresses": {
+    "addressListRegistry": "0xF20e59E464a94DE587060BA0D53C5AD314519843",
+    "comptrollerLib": "0xd37269d1A023AF210a191281f9a22D49f22f41D7",
+    "dispatcher": "0x7D820468785DA0f7024697e537d5ecd562e9f8d9",
+    "externalPositionFactory": "0xF5A6124C3b13C808821aAd092c698b60128a2737",
+    "externalPositionManager": "0xEABcB578F9Ef0B4583B523fc57C05188a098621E",
+    "feeManager": "0x9B552406037758e7f9B3623e6F0e678EF6Ceec3e",
+    "fundDeployer": "0xe4F49E42BadB4A6E87E277A0140E9cE0F3e3B2e0",
+    "fundValueCalculator": "0xB0518f00C94193E58bf84FBD3E8Bb94a3BCB9151",
+    "fundValueCalculatorRouter": "0x71cdfC57027069aF7610eEd58Dc7fE93Fc070707",
+    "gasRelayPaymasterFactory": "0xF2ea27c7b2e586B61af27223A7707356F685F718",
+    "globalConfigProxy": "0x2f0049B8f0903fC4b2D3a9c66e59C275372b8fbA",
+    "integrationManager": "0x7682B6DDC20CE79B1cc4C30647f0384E7F2Ab918",
+    "policyManager": "0x145D50E8dAeAAB284CAc5d888759657229fB723D",
+    "protocolFeeReserveProxy": "0x130187bb816acCA71aA39091F238Ac42c172Ed16",
+    "protocolFeeTracker": "0x0C521EcA10D7f98ac98f14BBf6261e0716e2989c",
+    "uintListRegistry": "0xe93Be65c0B1260AB329721a5e36e7D61C6919A36",
+    "valueInterpreter": "0xA7759921f1a8345791cBa9960485b47a0d7B0838",
+    "vaultLib": "0xCD24332ebE0E63ef540D69D2F8Aabe81F181dbb8"
+  },
+  "blockNumberAtDeploy": 26099921,
+  "blockTimestampAtDeploy": 1790887259,
+  "chain": "ethereum",
+  "chainId": 1,
+  "chainlinkStaleRateThresholdSeconds": 172800,
+  "configSha256": "a294be9d9008a4cfede767cf8da7beed0d619f18b016b7627e6a69429a0c717f",
+  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "forkBlock": 26099920,
+  "label": "ANVIL FORK DRY RUN - NOT A MAINNET DEPLOYMENT. Addresses exist only on a throwaway local fork.",
+  "runKind": "anvil-fork-dry-run",
+  "scriptCommit": "de54c262c73f484510f68a5a98d173ca94b7bc57",
+  "scriptTreeDirty": "false",
+  "log": {
+    "path": "deployments/fork-samples/ethereum.log",
+    "sha256": "8340aab708be0067d38ed97c22ffab0507050867d8932e2e3f49e463ee2039f9"
+  },
+  "reproduce": "script/fork-dry-run.sh ethereum 26099920  (same commit + same fork block + same sender => same addresses)"
+}

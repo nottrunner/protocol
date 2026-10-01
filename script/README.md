@@ -80,6 +80,40 @@ CHAIN=base DISPATCHER_OWNER=<multisig> forge script script/DeployCore.s.sol:Depl
 `DISPATCHER_OWNER` (optional) only *nominates* the new Dispatcher owner at the end; that address must call `claimOwnership()`.
 `MLN_BURNER` (optional env) sets VaultLib's MLN burner (default `address(0)`).
 
+## Reproducible deployment records (`deployments/`)
+
+`DeployCore` writes a JSON record (addresses, chain id, block at deploy, fork block, deployer, stale threshold, script commit SHA,
+config SHA-256) **only when `RUN_KIND` is set**. `RUN_KIND=broadcast` is the only kind allowed to write `deployments/<chain>.json`
+(a real deployment record, to be committed after a real, approved broadcast). Fork dry runs go to `deployments/fork-samples/`.
+
+`deployments/fork-samples/<chain>.json|.log` are **samples from anvil-fork dry runs (label: "ANVIL FORK DRY RUN - NOT A MAINNET DEPLOYMENT")**.
+The addresses exist only on a throwaway local fork; nothing was broadcast. They contain no keys (Anvil account #0 *address* only).
+
+How QA reproduces a sample (needs `forge`/`anvil`, `python3`, a clean checkout of the commit named in the file's `scriptCommit`):
+```bash
+git checkout <scriptCommit> && git submodule update --init --recursive
+script/fork-dry-run.sh <ethereum|base|arbitrum|robinhood> <forkBlock>    # forkBlock from the sample file
+diff <(jq -S .addresses deployments/fork-samples/<chain>.json) <(git show <commit>:deployments/fork-samples/<chain>.json | jq -S .addresses)
+```
+The addresses are CREATE addresses of the sender (Anvil #0), so the same commit + same fork block + same sender gives the same addresses
+(an archive-capable RPC is needed for old blocks; public RPCs may prune old state, and Robinhood's public RPC rate-limits, which is why the
+wrapper throttles anvil). Omit `<forkBlock>` to fork at the chain head (new addresses if the sender's nonce differs). `scriptCommit` is the commit
+at run time; `DeployCore.s.sol` is identical between the commits named in the samples (later commits only touched the wrapper script).
+The `.log` file is the filtered forge output of that run (its SHA-256 is in the JSON `log` field).
+
+## Stale-rate thresholds (per chain)
+
+`ValueInterpreter` has ONE immutable stale threshold per deployment, so it is sized for the slowest registered feed. Too low: valid rates
+revert (valuation, deposits, redeems freeze, fails closed). Too high: stale prices are accepted. Details and evidence per feed are in each
+`config/chains/*.json` (`chainlinkStaleRateThresholdNote`, per-feed `heartbeatSeconds` / `observedMaxGapSeconds`).
+
+| Chain | Registered feeds (heartbeat; max observed gap) | Threshold |
+|---|---|---|
+| Ethereum | ETH/USD (3600s; 15996s), USDC/ETH (86400s; 97800s) | 172800 s |
+| Base | ETH/USD (**heartbeat UNVERIFIED**; 1232s), USDC/USD (86400s; 86490s) | 172800 s |
+| Arbitrum | ETH/USD (1755s; 630s), USDC/USD (255s; 330s) | 3600 s |
+| Robinhood | ETH/USD (86400s; 32560s), USDG/USD (86400s; 86430s) | 172800 s |
+
 ## Verified in this PR
 `forge build contracts` OK; dry run executed successfully against local anvil forks of all four chains (including the post-deploy pricing check).
 Nothing was broadcast.

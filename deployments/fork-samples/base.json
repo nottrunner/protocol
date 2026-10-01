@@ -1,0 +1,39 @@
+{
+  "addresses": {
+    "addressListRegistry": "0x073333d5A7aE09A205fAeDc3BB70AFD6d792E857",
+    "comptrollerLib": "0xa5B8e16F3f25Ba623d26D7C0864A1b798A13c162",
+    "dispatcher": "0x4E8e3E7aE4F96293282857E5d90A89571e663cac",
+    "externalPositionFactory": "0x4F2520a94BcD18B8b6832410bf9cbeC5473d23Ee",
+    "externalPositionManager": "0x17434891234feAe6a4389A26Fa566c2610a1b156",
+    "feeManager": "0x75FB485650e1495ff4F7b666a58c95be0CC08b4d",
+    "fundDeployer": "0x6cEE3AC97C67E0B39238fb564faf10218C59a6e9",
+    "fundValueCalculator": "0xccd32D31dB1EC644d5Fc09Ab86931a867547385B",
+    "fundValueCalculatorRouter": "0x41765bEb6C9109D9ceFF959491f131E351B5d748",
+    "gasRelayPaymasterFactory": "0xb2f3dB22240B6e3986F9323e1607d443C2c7a9E4",
+    "globalConfigProxy": "0xd0873D3A1b8EDB79cEa4FC46259D5C862474Cc7f",
+    "integrationManager": "0xA19c9bC872a46Ad2B3EED81ec43349F8DB8f8D9F",
+    "policyManager": "0x78197f4Bf9Ab0E798E6ADE43e96a328996B8A455",
+    "protocolFeeReserveProxy": "0x1DC801660c593FC19a35E8a8Df7e6A7Ea3dA61BF",
+    "protocolFeeTracker": "0x48D705f1d64E7Ffe3EFcE15D8d8061b20aB4C929",
+    "uintListRegistry": "0x4504f3698FC92C147f9699a8F8E049834C73D7D0",
+    "valueInterpreter": "0xce3774eE9D08a2532B7Ff4b1B2aa0529a66f3B07",
+    "vaultLib": "0x99de02aF14C9bb491540cc0a29594aF07a6cA4d1"
+  },
+  "blockNumberAtDeploy": 52048967,
+  "blockTimestampAtDeploy": 1790887279,
+  "chain": "base",
+  "chainId": 8453,
+  "chainlinkStaleRateThresholdSeconds": 172800,
+  "configSha256": "1db19b2b4d6af81d44ec4072354f4721b1e54a882e8d89dabeca2393c88ae7d4",
+  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "forkBlock": 52048966,
+  "label": "ANVIL FORK DRY RUN - NOT A MAINNET DEPLOYMENT. Addresses exist only on a throwaway local fork.",
+  "runKind": "anvil-fork-dry-run",
+  "scriptCommit": "de54c262c73f484510f68a5a98d173ca94b7bc57",
+  "scriptTreeDirty": "false",
+  "log": {
+    "path": "deployments/fork-samples/base.log",
+    "sha256": "5cd15947aff53f2fb4198b53834728332031c92d35bc021e05854111db989a65"
+  },
+  "reproduce": "script/fork-dry-run.sh base 52048966  (same commit + same fork block + same sender => same addresses)"
+}
