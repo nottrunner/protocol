@@ -305,3 +305,45 @@ export async function swapFlow(
     incomingAssets: evt.args.incomingAssets, incomingAmounts: evt.args.incomingAssetAmounts,
   };
 }
+
+export type RequoteOutcome<R> =
+  | { status: "sent"; result: R; quote: PreparedSwap; excluded: string[] }
+  /** A fresh quote was worse than the one the user saw by more than the slippage: NOTHING was sent for it. */
+  | { status: "moved"; shown: PreparedSwap | undefined; fresh: PreparedSwap; excluded: string[] };
+
+/**
+ * Re-quote + execute with the "quote moved" guard applied to EVERY fresh quote, including those fetched by the ParaSwap
+ * "exclude the failing liquidity source" retry loop, each compared with the quote the user saw (`shown`), never with the
+ * previous retry. If any fresh quote is worse than `shown` by more than the slippage, nothing further is sent and
+ * the caller gets `moved` with that quote to display. Any other error (incl. the final simulation failure) is rethrown.
+ */
+export async function requoteAndExecute<R>(args: {
+  shown: PreparedSwap | undefined;
+  slippageBps: number;
+  isParaSwap: boolean;
+  prepare: (excludeDexes?: string[]) => Promise<PreparedSwap>;
+  execute: (q: PreparedSwap) => Promise<R>;
+  /** called with each quote about to be executed, and with the new quote on `moved` */
+  onQuote?: (q: PreparedSwap) => void;
+  onRetry?: (failedExchanges: string[]) => void;
+  maxExcluded?: number;
+}): Promise<RequoteOutcome<R>> {
+  const excluded: string[] = [];
+  let fresh = await args.prepare();
+  for (;;) {
+    if (args.shown && quoteWorseBeyondSlippage(args.shown.expectedOut, fresh.expectedOut, args.slippageBps)) {
+      args.onQuote?.(fresh);
+      return { status: "moved", shown: args.shown, fresh, excluded };
+    }
+    args.onQuote?.(fresh);
+    try {
+      return { status: "sent", result: await args.execute(fresh), quote: fresh, excluded };
+    } catch (err) {
+      const next = (fresh.exchanges ?? []).filter((e) => !excluded.includes(e));
+      if (!(err instanceof SwapSimulationError) || !args.isParaSwap || next.length === 0 || excluded.length >= (args.maxExcluded ?? 2)) throw err;
+      excluded.push(...next);
+      args.onRetry?.(next);
+      fresh = await args.prepare(excluded);
+    }
+  }
+}

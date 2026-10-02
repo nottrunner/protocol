@@ -43,12 +43,22 @@ if (files.length === 0) {
   process.exit(2);
 }
 const hits = new Map();
+// The flag's own name must not appear as a string literal in a default bundle either (the flag read itself is inlined
+// by Next via next.config `env`, so only a stray literal, e.g. in a diagnostic message, could leak it).
+const FLAG_NAME = "use_fork_deployments";
+let flagLiteralFiles = 0;
 for (const f of files) {
   const text = readFileSync(f, "utf8").toLowerCase();
+  if (text.includes(FLAG_NAME)) flagLiteralFiles++;
   for (const [addr, label] of markers) if (text.includes(addr)) hits.set(label, (hits.get(label) ?? 0) + 1);
 }
 console.log(`scanned ${files.length} files under ${root}; ${markers.size} fork-record addresses checked`);
 console.log(`  ${hits.size} of ${markers.size} markers found`);
+if (mode === "absent") console.log(`  flag name literal (USE_FORK_DEPLOYMENTS) found in ${flagLiteralFiles} files`);
+if (mode === "absent" && flagLiteralFiles > 0) {
+  console.error("FAIL: the string USE_FORK_DEPLOYMENTS is present in the default build output.");
+  process.exit(1);
+}
 if (mode === "absent" && hits.size > 0) {
   console.error(`FAIL: fork deployment data leaked into the build: ${[...hits.keys()].slice(0, 5).join(", ")} ...`);
   process.exit(1);

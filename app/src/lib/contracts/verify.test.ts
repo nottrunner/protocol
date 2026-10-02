@@ -38,7 +38,7 @@ vi.mock("wagmi/actions", () => ({
 }));
 
 import { depositFlow, redeemFlow } from "./flows";
-import { evaluateVaultVerification, assertVerifiedVault, UnverifiedVaultError, verifyVault } from "./verify";
+import { evaluateVaultVerification, assertVerifiedVault, savedVaultStatus, UnverifiedVaultError, verifyVault } from "./verify";
 import { swapFlow, type PreparedSwap } from "./swap";
 
 const config = {} as Config;
@@ -173,5 +173,19 @@ describe("no approval / transaction path is reachable for an unverified vault", 
     setup();
     await expect(deposit()).rejects.toThrow("STOP_AFTER_APPROVE");
     expect(state.writes).toEqual([{ fn: "approve", address: USDC, args: [COMPTROLLER, BigInt(100)] }]);
+  });
+});
+
+describe("savedVaultStatus (My portfolios annotation for vaults saved by earlier versions; fails closed)", () => {
+  it("pending check => checking; only a verified result => verified", () => {
+    expect(savedVaultStatus(undefined)).toBe("checking");
+    expect(savedVaultStatus({ status: "verified", fundDeployer: FD })).toBe("verified");
+  });
+  it("mismatch, zero address, revert/RPC error, no FundDeployer, and a failed query are all unverified", () => {
+    for (const reason of ["mismatch", "zero-address", "dispatcher-error", "no-fund-deployer", "no-dispatcher", "invalid-vault", "comptroller-mismatch"] as const) {
+      expect(savedVaultStatus({ status: "unverified", reason })).toBe("unverified");
+    }
+    expect(savedVaultStatus(undefined, true)).toBe("unverified");
+    expect(savedVaultStatus({ status: "verified", fundDeployer: FD }, true)).toBe("unverified");
   });
 });

@@ -191,7 +191,7 @@ export function resolveChainDeployment(chainId: number, input: LoaderInput): Cha
     if (cls === "invalid") {
       notes.push("deployment record is malformed (ignored)");
     } else if (cls !== "mainnet" && !input.useFork) {
-      notes.push(`${cls} deployment record ignored (NEXT_PUBLIC_USE_FORK_DEPLOYMENTS is off)`);
+      notes.push(`${cls} deployment records for this chain are not enabled in this build`);
     } else if ((rawRecord as { chainId?: unknown }).chainId !== chainId) {
       notes.push("deployment record chainId mismatch (ignored)");
     } else {

@@ -7,7 +7,7 @@ import { explorerUrl } from "@/config/chains";
 import { tokensFor } from "@/config/tokens";
 import { formatAmount, safeParseUnits, shortAddress } from "@/lib/format";
 import {
-  errorMessage, quoteWorseBeyondSlippage, SwapSimulationError, useDeployment, useSwap, useTokenInfo, type PortfolioData, type PreparedSwap, type SwapFlowResult, type TokenInfo,
+  errorMessage, requoteAndExecute, useDeployment, useSwap, useTokenInfo, type PortfolioData, type PreparedSwap, type SwapFlowResult, type TokenInfo,
 } from "@/lib/contracts";
 import { Notice } from "./Notice";
 
@@ -89,32 +89,25 @@ export function SwapCard({ portfolio, disabled, onDone }: { portfolio: Portfolio
       // Re-quote right before sending so minOut is fresh, then execute exactly what was quoted.
       const input = { route: route!, tokenIn: tokenIn!, tokenOut: tokenOut!, amountIn: parsed!, slippageBps: slippage };
       const shown = prepared; // the quote the user saw and confirmed by pressing Swap
-      let fresh = await prepare(input);
-      if (shown && quoteWorseBeyondSlippage(shown.expectedOut, fresh.expectedOut, slippage)) {
-        // Nothing sent: show the new quote and make the user confirm it.
-        setPrepared(fresh);
+      // Every fresh quote (also the ones from the ParaSwap "exclude the failing source" retries) is compared with `shown`.
+      const out = await requoteAndExecute({
+        shown,
+        slippageBps: slippage,
+        isParaSwap: route!.kind === "paraSwapV6",
+        prepare: (excludeDexes) => prepare(excludeDexes ? { ...input, excludeDexes } : input),
+        // Snapshot the tokens: after the swap the holdings change, so the live selection may no longer match what was traded.
+        execute: async (q) => ({ ...(await execute(q)), shownIn: tokenIn!, shownOut: tokenOut! }),
+        onQuote: setPrepared,
+        onRetry: (failed) => setNote(`ParaSwap route via ${failed.join(", ")} reverted in simulation; re-quoted without it.`),
+      });
+      if (out.status === "moved") {
+        // Nothing sent: the new quote is displayed; make the user confirm it.
         throw new Error(
-          `The quote moved: ${formatAmount(fresh.expectedOut, tokenOut!.decimals)} ${tokenOut!.symbol} now instead of ${formatAmount(shown.expectedOut, tokenOut!.decimals)}. ` +
+          `The quote moved: ${formatAmount(out.fresh.expectedOut, tokenOut!.decimals)} ${tokenOut!.symbol} now instead of ${formatAmount(shown!.expectedOut, tokenOut!.decimals)}. ` +
           "That is worse than your slippage setting, so nothing was sent. Review the new quote and press Swap again.",
         );
       }
-      const excluded: string[] = [];
-      for (;;) {
-        setPrepared(fresh);
-        try {
-          // Snapshot the tokens: after the swap the holdings change, so the live selection may no longer match what was traded.
-          setResult({ ...(await execute(fresh)), shownIn: tokenIn!, shownOut: tokenOut! });
-          break;
-        } catch (err) {
-          // The pre-send simulation reverted (nothing signed). A ParaSwap route can depend on a liquidity source that does not
-          // work at this chain state (typically market makers on a stale fork): re-quote without it, at most twice.
-          const next = (fresh.exchanges ?? []).filter((e) => !excluded.includes(e));
-          if (!(err instanceof SwapSimulationError) || route!.kind !== "paraSwapV6" || next.length === 0 || excluded.length >= 2) throw err;
-          excluded.push(...next);
-          setNote(`ParaSwap route via ${next.join(", ")} reverted in simulation; re-quoted without it.`);
-          fresh = await prepare({ ...input, excludeDexes: excluded });
-        }
-      }
+      setResult(out.result);
       setAmount("");
       await onDone();
     } catch (err) {
