@@ -132,7 +132,7 @@ No contract address is hardcoded in the app. Per chain, `src/lib/deployments` re
 2. **Env overrides** (always win, no flag needed): `NEXT_PUBLIC_FUND_DEPLOYER_<CHAIN>` plus optional
    `NEXT_PUBLIC_VALUE_INTERPRETER_<CHAIN>`, `..._FUND_VALUE_CALCULATOR_ROUTER_<CHAIN>`, `..._DEPLOY_BLOCK_<CHAIN>`,
    `..._DENOMINATION_ASSETS_<CHAIN>` (`USDC:0x..,USDG:0x..`), `..._UNISWAP_V3_ADAPTER_<CHAIN>`,
-   `..._UNISWAP_V3_SWAPROUTER02_ADAPTER_<CHAIN>`, `..._UNISWAP_V3_QUOTER_<CHAIN>`. If the FundDeployer override differs from the
+   `..._UNISWAP_V3_SWAPROUTER02_ADAPTER_<CHAIN>`, `..._PARASWAP_V6_ADAPTER_<CHAIN>`, `..._UNISWAP_V3_QUOTER_<CHAIN>`. If the FundDeployer override differs from the
    record's `fundDeployer`, the record is **superseded** for that chain (its other addresses are not mixed in); the app
    then discovers the rest on-chain (ValueInterpreter and IntegrationManager from the vault's ComptrollerLib).
 
@@ -148,44 +148,99 @@ Like the mock wallet, the flag is guarded: `npm run build` **fails** if it is `1
 run by `prebuild` and again from `next.config.mjs`; tested in `scripts/fork-deployments-guard.test.ts`). Setting
 `NEXT_PUBLIC_FUND_DEPLOYER_<CHAIN>` is a separate explicit opt-in and is not blocked.
 
-Record fields used: `addresses.*`, `denominationAsset` (and an optional `denominationAssets` list), `forkBlock`,
-`blockNumberAtDeploy`, optional `deployBlock`, and the optional sections described below. Proposed (not yet written by
-`DeployCore`) fields, all handled when absent:
+Record fields used (shape of `script/DeployCore.s.sol` on `feat/deploy-scripts` / `feat/register-adapters`, PR #8):
 
 ```jsonc
 {
-  "deployBlock": 123456789,                       // chain-native block of the FundDeployer deployment (see note)
-  "denominationAssets": [{ "symbol": "USDC", "address": "0x..." }],  // else [denominationAsset]
-  "adapters": {                                   // swap UI only appears when the chain-eligible adapter is present
-    "uniswapV3Adapter": "0x...",                  // Ethereum, Arbitrum (original SwapRouter)
-    "uniswapV3SwapRouter02Adapter": "0x..."       // Base only (PR #4 adapter)
-  },
-  "externalContracts": { "uniswapV3QuoterV2": "0x..." }   // else the official QuoterV2 for the chain
+  "chain": "base", "chainId": 8453,
+  "kind": "fork, not mainnet", "mainnet": false, "runKind": "fork", "forkBlock": 52072367,
+  "blockNumberAtDeploy": 52072400,                  // Solidity block.number (L1 number on Arbitrum / Robinhood!)
+  "evmBlockNumberAtDeploy": 52072400,               // optional, chain-native
+  "denominationAsset": { "symbol": "USDC", "address": "0x..." },
+  "approvedAdaptersListId": 1,                      // AddressListRegistry list of the registered swap adapters
+  "addresses": {
+    "fundDeployer": "0x...", "valueInterpreter": "0x...", "fundValueCalculatorRouter": "0x...",
+    "uniswapV3Adapter": "0x...",                    // Ethereum, Arbitrum (original SwapRouter)
+    "uniswapV3SwapRouter02Adapter": "0x...",        // Base only (PR #4 adapter)
+    "paraSwapV6Adapter": "0x..."                    // Ethereum, Base, Arbitrum
+  }
 }
 ```
 
-`blockNumberAtDeploy` is Solidity's `block.number`, which on Arbitrum One and Robinhood Chain (Arbitrum Orbit) is the **L1**
-number, so it is never used as a log-scan start there. Fork records use `forkBlock` (chain-native); real records need
-`deployBlock` on those chains, else scans use a bounded look-back.
+Optional extras handled when present: `deployBlock` (chain-native block of the FundDeployer deployment, needed for real records on
+Arbitrum/Robinhood), `denominationAssets` (list), `externalContracts.uniswapV3QuoterV2`. `blockNumberAtDeploy` is never used as a
+log-scan start on Orbit chains; fork records use `forkBlock`; otherwise scans use a bounded look-back.
+
+## Portfolio flows (what the app does)
+
+| Route | Flow | AC |
+| --- | --- | --- |
+| header network switcher + RainbowKit | connect / switch network (wallet follows the URL chain via a "Switch wallet to X" button) | AC-1 |
+| `/create` | create a portfolio (`FundDeployer.createNewFund`): name, symbol, denomination asset from the chain's allowed list (checked against `ValueInterpreter.isSupportedPrimitiveAsset`), owner = connected wallet, no fees/policies; shows vault + comptroller | AC-2 |
+| `/portfolio/<chain>/<vault>` | view (name, symbol, owner, denomination, shares, share price, NAV/GAV, holdings with value), **deposit** (approve + `buyShares` with a `minSharesQuantity` slippage bound), **redeem** (in kind, or into the denomination asset only), **swap** (owner / asset manager) | AC-3, AC-5, AC-4, AC-6 |
+| `/portfolio` | "My portfolios": `NewFundCreated` log scan (adaptive chunking, starts at the record's block) for vaults **created by** the connected account + vaults remembered in this browser + paste-an-address fallback | AC-6 |
+
+Everything is addressed by URL (`/portfolio/ethereum|base|arbitrum|robinhood/0xVault`), so reload / deep links work (AC-6).
+
+**Swap routes (AC-4).** The swap card exists only where the chain's record lists at least one eligible adapter, and always shows
+the route (adapter) selector: Ethereum / Arbitrum offer `UniswapV3Adapter` (default) and `ParaSwapV6Adapter`; Base offers
+`UniswapV3SwapRouter02Adapter` (default) and `ParaSwapV6Adapter` (the original-router adapter is never offered on Base); Robinhood
+has none, so it shows "Swaps not enabled on this chain" (`data-testid="swap-disabled"`). Uniswap quotes come from QuoterV2
+(direct fee tiers + WETH 2-hop); ParaSwap quotes/calldata come from the public Velora API (`api.paraswap.io`, `swapExactAmountIn`
+only, needs internet) and are re-encoded for the adapter. The swap runs through
+`Comptroller.callOnExtension(IntegrationManager, 0, abi.encode(adapter, selector, data))` after a pre-send simulation. The result
+states which adapter executed (read from the `CallOnIntegrationExecutedForFund` event), for QA:
+`data-testid` `swap-route` (selector), `swap-route-adapter`, `swap-result`, `swap-result-route` (+`data-route-kind` =
+`uniswapV3 | uniswapV3SwapRouter02 | paraSwapV6`), `swap-result-adapter` (address), `swap-result-spent`, `swap-result-received`.
+If a ParaSwap route reverts in simulation (e.g. a market maker whose quote is stale on a local fork) the app re-quotes without that
+liquidity source (twice at most) and says so (`swap-reroute-note`).
+
+## QA: run the exact SHA against local Anvil forks (mock wallet, fork records)
+
+```bash
+git clone https://github.com/nottrunner/protocol && cd protocol && git checkout <SHA> && cd app && npm ci
+# 1. forks + deployment (from feat/deploy-scripts / feat/register-adapters): per chain, an Anvil fork with DeployCore *broadcast* to it, e.g.
+#    anvil --fork-url $RPC --port 8601 --chain-id 1 &   then   CHAIN=ethereum RUN_KIND=fork FORK_BLOCK=<n> OUTPUT_PATH=<dir>/ethereum.json \
+#    forge script script/DeployCore.s.sol:DeployCore --broadcast --unlocked --sender 0xf39F...2266 --rpc-url http://127.0.0.1:8601
+#    (script/fork-dry-run.sh does the same without --broadcast; the app needs the deployment to exist on the fork, so broadcast.)
+#    Fund QA accounts: script/fund-anvil.sh http://127.0.0.1:8601 <account> <token> <raw amount>   (account 1 = vault manager)
+# 2. build the app against those records and forks:
+export NEXT_PUBLIC_E2E_MOCK_WALLET=1 NEXT_PUBLIC_E2E_MOCK_ACCOUNT_INDEX=1 NEXT_PUBLIC_USE_FORK_DEPLOYMENTS=1 \
+       DEPLOYMENTS_DIR=<dir with ethereum.json base.json arbitrum.json robinhood.json> \
+       NEXT_PUBLIC_RPC_URL_ETHEREUM=http://127.0.0.1:8601 NEXT_PUBLIC_RPC_URL_BASE=http://127.0.0.1:8602 \
+       NEXT_PUBLIC_RPC_URL_ARBITRUM=http://127.0.0.1:8603 NEXT_PUBLIC_RPC_URL_ROBINHOOD=http://127.0.0.1:8645
+npm run build && npx next start -p 3100
+# 3. open http://localhost:3100/create -> Connect wallet -> "E2E Mock Wallet"
+```
+
+`scripts/qa-fork-flow.mjs <chainId> <swapAmount>` drives create -> deposit -> reload -> my portfolios -> swap (each route) -> redeem
+with Playwright (`npm i playwright` somewhere and run with `NODE_PATH`/`PLAYWRIGHT_MODULE`, see the file header) and prints the
+route/adapter shown for each swap.
+Tips: an Anvil fork serves state lazily from the upstream RPC, so the first quote / swap on a fresh fork can take tens of seconds on
+public RPCs. After a hard reload the mock wallet is on the default chain: use the "Switch wallet to X" button on the portfolio page.
+Nothing in this mode is shipped to production: the build fails if either flag is set with `VERCEL_ENV=production`.
 
 ## Layout
 
 ```
-src/app/                 routes: /, /create, /portfolio
+src/app/                 routes: /, /create, /portfolio, /portfolio/[chain]/[vault]
 src/components/          UI (may only import from '@/lib/contracts'; enforced by ESLint)
-src/config/              chains, feature flags, wagmi config, known tokens
+src/config/              chains, feature flags, wagmi config, known tokens, swap (QuoterV2) addresses
 src/e2e/                 test-only E2E mock wallet (compiled out unless NEXT_PUBLIC_E2E_MOCK_WALLET=1)
-scripts/                 build guard + bundle verification for the mock wallet
-src/lib/contracts/       isolated contracts layer: abis.ts, addresses.ts, hooks.ts, index.ts
+scripts/                 build guards + bundle verification (mock wallet, fork records), QA fork flow driver
+src/lib/deployments/     typed deployment-record loader (+ fixtures, tests)
+src/lib/contracts/       isolated contracts layer
 ```
 
 ### Contracts layer
 
-All chain interaction goes through `src/lib/contracts/` (`useCreatePortfolio`, `useVault`, `useDeposit`, `useRedeem`, ...).
-Addresses are in `addresses.ts`: `null` until known, with `TODO(addresses)` markers. Other open TODOs: fee/policy
-config encoding on create, NAV / share price display, slippage (`minShares`), portfolio listing (needs an indexer or a
-`NewFundCreated` log scan), swap UI. ABIs are minimal and derived from `contracts/release/core/**` and
-`contracts/persistent/vault/**`; re-check them against the release you deploy.
+All chain interaction goes through `src/lib/contracts/` (`index.ts` is the public API; components may not import `abis`/`addresses`):
+`calls.ts` (encoders + share maths), `flows.ts` (React-free create/deposit/redeem), `portfolio.ts` (reads, NAV via `eth_call` of the
+non-view calculators), `listing.ts` (log scan + saved vaults), `swap.ts` (Uniswap quoting, ParaSwap/Velora, `callOnExtension`
+encoding, swap flow), `hooks.ts` (React hooks). ABIs are hand-minimal, derived from `contracts/release/core/**`; re-check them
+against the release you deploy. Known limits: no fee / policy configuration on create; "My portfolios" finds vaults where the
+connected account is the **creator** (the event's indexed `creator`, which is not necessarily the owner); a vault someone else
+created for you needs the paste-address fallback; Robinhood Chain (no Multicall3 assumption is made) is deposit/redeem only.
 
 ## Deploying on Vercel
 
