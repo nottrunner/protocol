@@ -87,7 +87,12 @@ contract DeployCoreHarness is DeployCore {
         p.dispatcher = address(0x1111);
         Release memory r;
         r.integrationManager = address(0x2222);
-        writeDeployment(c, p, r);
+        Adapters memory a;
+        a.paraSwapV6Adapter = address(0x3333);
+        a.uniswapV3SwapRouter02Adapter = address(0x4444);
+        a.approvedAdaptersListId = 7;
+        a.listCreated = true;
+        writeDeployment(c, p, r, a);
     }
 
     function knownMainnet(uint256 _chainId) external returns (bool) {
@@ -256,6 +261,17 @@ contract DeployCoreRecordsTest is Test {
         assertTrue(
             keccak256(bytes(vm.parseJsonString(json, ".label"))) != keccak256("REAL BROADCAST DEPLOYMENT"), "label"
         );
+    }
+
+    function test_write_recordIncludesAdaptersAndListId() public {
+        h.setRunKind("fork");
+        h.setAnvil(true);
+        h.write("base");
+        string memory json = h.writtenJson();
+        assertEq(vm.parseJsonAddress(json, ".addresses.paraSwapV6Adapter"), address(0x3333));
+        assertEq(vm.parseJsonAddress(json, ".addresses.uniswapV3SwapRouter02Adapter"), address(0x4444));
+        assertEq(vm.parseJsonUint(json, ".approvedAdaptersListId"), 7);
+        assertEq(vm.parseJsonAddress(json, ".addresses.dispatcher"), address(0x1111)); // existing fields intact
     }
 
     function test_write_forkBroadcastToAnvilIsNotSimulated() public {
