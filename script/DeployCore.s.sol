@@ -45,6 +45,11 @@ interface VmKeyExists {
     function keyExistsJson(string calldata, string calldata) external view returns (bool);
 }
 
+/// @dev `vm.rpc` is not in the pinned forge-std Vm interface; used only to detect an Anvil node (`anvil_nodeInfo`).
+interface VmRpc {
+    function rpc(string calldata method, string calldata params) external returns (bytes memory);
+}
+
 /// @title DeployCore
 /// @notice Deploys the full fresh-fork stack (persistent + release core) for ONE chain, reading
 /// `config/chains/<CHAIN>.json`. Mirrors tests/utils/core/deployment/DeploymentUtils.sol, but with
@@ -64,6 +69,8 @@ contract DeployCore is Script {
         address mlnBurner;
         address ethUsdAggregator;
         uint256 staleRateThreshold;
+        string denominationSymbol;
+        address denominationAsset;
         uint256 positionsLimit;
         address gasRelayHub;
         address gasRelayForwarder;
@@ -120,20 +127,26 @@ contract DeployCore is Script {
 
     /// @dev Writes the addresses + provenance to a JSON file. Safe by default: nothing is written unless the env
     /// var RUN_KIND is set. Metadata comes from env (set by script/fork-dry-run.sh): RUN_KIND, GIT_SHA, GIT_DIRTY,
-    /// CONFIG_SHA256, FORK_BLOCK, OUTPUT_PATH (default deployments/<chain>.json only when RUN_KIND=broadcast).
+    /// CONFIG_SHA256, FORK_BLOCK, OUTPUT_PATH (default deployments/<chain>.json).
+    ///
+    /// Two kinds may write deployments/<chain>.json and the file always says which one it is, so a fork record can
+    /// never be mistaken for a mainnet deployment (and vice versa):
+    ///   RUN_KIND=fork      -> "kind": "fork, not mainnet", "mainnet": false. Requires the RPC to be an Anvil node.
+    ///   RUN_KIND=broadcast -> "kind": "mainnet broadcast",  "mainnet": true.  Refused on an Anvil node.
+    /// A real broadcast simply overwrites the fork record at the same path.
     function writeDeployment(Cfg memory _c, Persistent memory _p, Release memory _r) internal {
-        string memory kind = vm.envOr("RUN_KIND", string(""));
-        if (bytes(kind).length == 0) {
+        string memory runKind = vm.envOr("RUN_KIND", string(""));
+        if (bytes(runKind).length == 0) {
             console2.log("RUN_KIND not set: deployments/*.json not written");
             return;
         }
-        string memory defaultPath = string.concat("deployments/", _c.chain, ".json");
-        string memory path = vm.envOr("OUTPUT_PATH", defaultPath);
+        bool isBroadcast = keccak256(bytes(runKind)) == keccak256("broadcast");
         require(
-            keccak256(bytes(kind)) == keccak256("broadcast") || keccak256(bytes(path)) != keccak256(bytes(defaultPath)),
-            "DeployCore: only RUN_KIND=broadcast may write deployments/<chain>.json"
+            isBroadcast || keccak256(bytes(runKind)) == keccak256("fork"), "DeployCore: RUN_KIND must be fork|broadcast"
         );
+        require(isAnvil() != isBroadcast, "DeployCore: RUN_KIND=fork needs an Anvil node; broadcast must not be one");
 
+        string memory path = vm.envOr("OUTPUT_PATH", string.concat("deployments/", _c.chain, ".json"));
         string memory a = "addresses";
         vm.serializeAddress(a, "dispatcher", _p.dispatcher);
         vm.serializeAddress(a, "addressListRegistry", _p.addressListRegistry);
@@ -154,16 +167,21 @@ contract DeployCore is Script {
         vm.serializeAddress(a, "vaultLib", _r.vaultLib);
         string memory addrJson = vm.serializeAddress(a, "fundValueCalculator", _r.fundValueCalculator);
 
+        string memory d = "denomination";
+        vm.serializeString(d, "symbol", _c.denominationSymbol);
+        string memory denomJson = vm.serializeAddress(d, "address", _c.denominationAsset);
+
         string memory o = "deployment";
-        bool isBroadcast = keccak256(bytes(kind)) == keccak256("broadcast");
+        vm.serializeString(o, "kind", isBroadcast ? "mainnet broadcast" : "fork, not mainnet");
+        vm.serializeBool(o, "mainnet", isBroadcast);
         vm.serializeString(
             o,
             "label",
             isBroadcast
                 ? "REAL BROADCAST DEPLOYMENT"
-                : "ANVIL FORK DRY RUN - NOT A MAINNET DEPLOYMENT. Addresses exist only on a throwaway local fork."
+                : "ANVIL FORK RUN - NOT A MAINNET DEPLOYMENT. Addresses exist only on a throwaway local fork."
         );
-        vm.serializeString(o, "runKind", kind);
+        vm.serializeString(o, "runKind", runKind);
         vm.serializeString(o, "chain", _c.chain);
         vm.serializeUint(o, "chainId", block.chainid);
         vm.serializeUint(o, "blockNumberAtDeploy", block.number);
@@ -174,9 +192,27 @@ contract DeployCore is Script {
         vm.serializeString(o, "scriptCommit", vm.envOr("GIT_SHA", string("unknown")));
         vm.serializeString(o, "scriptTreeDirty", vm.envOr("GIT_DIRTY", string("unknown")));
         vm.serializeString(o, "configSha256", vm.envOr("CONFIG_SHA256", string("unknown")));
+        vm.serializeString(o, "denominationAsset", denomJson);
         string memory out = vm.serializeString(o, "addresses", addrJson);
         vm.writeJson(out, path);
         console2.log("wrote", path);
+    }
+
+    function upper(string memory _s) internal pure returns (string memory) {
+        bytes memory b = bytes(_s);
+        for (uint256 i; i < b.length; i++) {
+            if (b[i] >= 0x61 && b[i] <= 0x7a) b[i] = bytes1(uint8(b[i]) - 32);
+        }
+        return string(b);
+    }
+
+    /// @dev True iff the RPC answers Anvil's `anvil_nodeInfo`. Real nodes reject it.
+    function isAnvil() internal returns (bool) {
+        try VmRpc(address(vm)).rpc("anvil_nodeInfo", "[]") returns (bytes memory) {
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     // CONFIG
@@ -189,6 +225,10 @@ contract DeployCore is Script {
         c_.weth = vm.parseJsonAddress(json, ".tokens.weth.address");
         c_.wrappedNative = c_.weth; // all four chains use ETH as the gas token
         c_.staleRateThreshold = vm.parseJsonUint(json, ".release.chainlinkStaleRateThresholdSeconds");
+        c_.denominationSymbol = upper(vm.parseJsonString(json, ".denominationAsset"));
+        c_.denominationAsset = vm.parseJsonAddress(
+            json, string.concat(".tokens.", vm.parseJsonString(json, ".denominationAsset"), ".address")
+        );
         c_.positionsLimit = vm.parseJsonUint(json, ".release.vaultPositionsLimit");
         c_.ethUsdAggregator = vm.parseJsonAddress(json, ".chainlink.ethUsdAggregator.address");
         c_.mlnBurner = vm.envOr("MLN_BURNER", address(0));

@@ -2,7 +2,8 @@
 # Reproducible LOCAL fork dry run of script/DeployCore.s.sol. Never broadcasts, never uses a key.
 # Usage: script/fork-dry-run.sh <ethereum|base|arbitrum|robinhood> [fork_block]
 #   env: the chain's RPC var (ETHEREUM_NODE_MAINNET / _BASE / _ARBITRUM / _ROBINHOOD); public endpoints are used if unset.
-# Output: deployments/fork-samples/<chain>.json (+ deployments/fork-samples/<chain>.log), labelled as a fork run.
+# Output: deployments/<chain>.json (+ deployments/logs/<chain>.fork-run.txt), recorded as "kind": "fork, not mainnet", "mainnet": false.
+# Refuses to overwrite a record whose kind is "mainnet broadcast".
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$HOME/.foundry/bin:$PATH"
@@ -16,8 +17,11 @@ case "$CHAIN" in
 esac
 SENDER=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266   # Anvil public account #0 (address only)
 [ -n "$PIN" ] || PIN=$(cast block-number --rpc-url "$URL")
-OUTDIR=deployments/fork-samples; mkdir -p "$OUTDIR"
-LOG="$OUTDIR/$CHAIN.log"
+OUTDIR=deployments; LOGDIR=deployments/logs; mkdir -p "$OUTDIR" "$LOGDIR"
+LOG="$LOGDIR/$CHAIN.fork-run.txt"
+if [ -f "$OUTDIR/$CHAIN.json" ] && [ "$(jq -r '.mainnet // false' "$OUTDIR/$CHAIN.json")" = "true" ]; then
+  echo "refusing to overwrite $OUTDIR/$CHAIN.json: it is a mainnet broadcast record" >&2; exit 1
+fi
 
 # --compute-units-per-second/--retries/--fork-retry-backoff keep public RPCs (e.g. Robinhood, HTTP 429) from failing the fork
 anvil --fork-url "$URL" --fork-block-number "$PIN" --port "$PORT" --chain-id "$ID" --compute-units-per-second 25 --retries 20 --fork-retry-backoff 1000 >/dev/null 2>&1 &
@@ -26,7 +30,7 @@ for _ in $(seq 1 180); do cast chain-id --rpc-url "http://127.0.0.1:$PORT" >/dev
 cast rpc --rpc-url "http://127.0.0.1:$PORT" evm_mine >/dev/null 2>&1 || true   # avoids "Excess blob gas not set" on some forks
 
 forge build contracts >/dev/null
-export CHAIN RUN_KIND=anvil-fork-dry-run FORK_BLOCK=$PIN OUTPUT_PATH="$OUTDIR/$CHAIN.json"
+export CHAIN RUN_KIND=fork FORK_BLOCK=$PIN OUTPUT_PATH="$OUTDIR/$CHAIN.json"
 export GIT_SHA=$(git rev-parse HEAD) CONFIG_SHA256=$(sha256sum "config/chains/$CHAIN.json" | cut -d' ' -f1)
 export GIT_DIRTY=$([ -z "$(git status --porcelain -- script config foundry.toml contracts)" ] && echo false || echo true)
 forge script script/DeployCore.s.sol:DeployCore --rpc-url "http://127.0.0.1:$PORT" --sender "$SENDER" -vv 2>&1 \

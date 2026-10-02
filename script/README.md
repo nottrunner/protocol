@@ -80,26 +80,36 @@ CHAIN=base DISPATCHER_OWNER=<multisig> forge script script/DeployCore.s.sol:Depl
 `DISPATCHER_OWNER` (optional) only *nominates* the new Dispatcher owner at the end; that address must call `claimOwnership()`.
 `MLN_BURNER` (optional env) sets VaultLib's MLN burner (default `address(0)`).
 
-## Reproducible deployment records (`deployments/`)
+## Deployment records (`deployments/<chain>.json`)
 
-`DeployCore` writes a JSON record (addresses, chain id, block at deploy, fork block, deployer, stale threshold, script commit SHA,
-config SHA-256) **only when `RUN_KIND` is set**. `RUN_KIND=broadcast` is the only kind allowed to write `deployments/<chain>.json`
-(a real deployment record, to be committed after a real, approved broadcast). Fork dry runs go to `deployments/fork-samples/`.
+`DeployCore` writes a JSON record only when `RUN_KIND` is set. Exactly two kinds exist, and every record states which one it is in
+top-level fields, so a fork record cannot be mistaken for a mainnet deployment:
 
-`deployments/fork-samples/<chain>.json|.log` are **samples from anvil-fork dry runs (label: "ANVIL FORK DRY RUN - NOT A MAINNET DEPLOYMENT")**.
-The addresses exist only on a throwaway local fork; nothing was broadcast. They contain no keys (Anvil account #0 *address* only).
+| `RUN_KIND` | `kind` | `mainnet` | Allowed on | Written by |
+|---|---|---|---|---|
+| `fork` | `"fork, not mainnet"` | `false` | Anvil nodes only (checked with `anvil_nodeInfo`; anything else reverts) | `script/fork-dry-run.sh` |
+| `broadcast` | `"mainnet broadcast"` | `true` | real nodes only (reverts on an Anvil node) | a real, approved `--broadcast` run (see above) |
 
-How QA reproduces a sample (needs `forge`/`anvil`, `python3`, a clean checkout of the commit named in the file's `scriptCommit`):
+Both write to `deployments/<chain>.json`, so a later real broadcast **overwrites** the fork record at the same path (`kind` flips to
+`"mainnet broadcast"`, `mainnet` to `true`, `label` to `REAL BROADCAST DEPLOYMENT`). `script/fork-dry-run.sh` refuses to overwrite a record
+with `"mainnet": true`. Review the `kind`/`mainnet` fields (and `git diff`) before committing a record.
+
+Fields: `kind`, `mainnet`, `label`, `runKind`, `chain`, `chainId`, `forkBlock` (0 for a broadcast), `blockNumberAtDeploy`, `blockTimestampAtDeploy`,
+`deployer`, `chainlinkStaleRateThresholdSeconds`, `denominationAsset` (`symbol`, `address`), `scriptCommit` (git SHA of the script at run time),
+`scriptTreeDirty`, `configSha256`, `addresses`; fork records also carry `log` (path + SHA-256 of `deployments/logs/<chain>.fork-run.txt`)
+and `reproduce`. The addresses of a fork record exist only on a throwaway local fork; nothing was broadcast. No keys are involved (Anvil
+account #0 *address* only; `forge script` runs without `--broadcast`).
+
+Reproduce a fork record (needs `forge`/`anvil`, `python3`, `jq`, a clean checkout of `scriptCommit`):
 ```bash
 git checkout <scriptCommit> && git submodule update --init --recursive
-script/fork-dry-run.sh <ethereum|base|arbitrum|robinhood> <forkBlock>    # forkBlock from the sample file
-diff <(jq -S .addresses deployments/fork-samples/<chain>.json) <(git show <commit>:deployments/fork-samples/<chain>.json | jq -S .addresses)
+script/fork-dry-run.sh <ethereum|base|arbitrum|robinhood> <forkBlock>    # forkBlock from the record
+diff <(jq -S .addresses deployments/<chain>.json) <(git show <commit>:deployments/<chain>.json | jq -S .addresses)
 ```
 The addresses are CREATE addresses of the sender (Anvil #0), so the same commit + same fork block + same sender gives the same addresses
-(an archive-capable RPC is needed for old blocks; public RPCs may prune old state, and Robinhood's public RPC rate-limits, which is why the
-wrapper throttles anvil). Omit `<forkBlock>` to fork at the chain head (new addresses if the sender's nonce differs). `scriptCommit` is the commit
-at run time; `DeployCore.s.sol` is identical between the commits named in the samples (later commits only touched the wrapper script).
-The `.log` file is the filtered forge output of that run (its SHA-256 is in the JSON `log` field).
+(an archive-capable RPC is needed for old blocks; public RPCs prune old state, and Robinhood's public RPC rate-limits, which is why the
+wrapper throttles anvil). Omit `<forkBlock>` to fork at the chain head. The wrapper uses `ETHEREUM_NODE_*` if set, otherwise public endpoints.
+`scriptCommit` is the commit at run time and may be older than the commit that adds the record (records are committed after the run).
 
 ## Stale-rate thresholds (per chain)
 
