@@ -1,6 +1,17 @@
 {
   "_readme": "Chain ids whose real deployments may be labelled 'mainnet broadcast' by script/finalize-broadcast.sh. Any other non-Anvil network is labelled 'testnet or unknown network' (mainnet false). Single source of truth for DeployCore.s.sol and finalize-broadcast.sh.",
-  "mainnetChainIds": [1, 8453, 42161, 4663],
-  "names": { "1": "Ethereum", "8453": "Base", "42161": "Arbitrum One", "4663": "Robinhood Chain" },
-  "todo": "HyperEVM (chain id 999) will be added here when it is deployed to."
+  "mainnetChainIds": [
+    1,
+    8453,
+    42161,
+    4663,
+    999
+  ],
+  "names": {
+    "1": "Ethereum",
+    "8453": "Base",
+    "42161": "Arbitrum One",
+    "4663": "Robinhood Chain",
+    "999": "HyperEVM"
+  }
 }

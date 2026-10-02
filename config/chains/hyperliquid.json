@@ -1,0 +1,94 @@
+{
+  "_readme": "HyperEVM (Hyperliquid), chain id 999. No keys or RPC URLs with API keys belong in this file. 'verified' notes say how each address was checked (rpc = on-chain read on 2026-10-02 via https://rpc.hyperliquid.xyz/evm; web = cited page). Omitted keys are unknown and read as address(0) by the deploy scripts; see 'todo'.",
+  "name": "hyperliquid",
+  "chainId": 999,
+  "rpc": {
+    "envVar": "ETHEREUM_NODE_HYPERLIQUID",
+    "foundryAlias": "hyperliquid",
+    "publicEndpointForReadsOnly": "https://rpc.hyperliquid.xyz/evm"
+  },
+  "tokens": {
+    "weth": {
+      "address": "0x5555555555555555555555555555555555555555",
+      "verified": "rpc: name 'Wrapped HYPE', symbol WHYPE, 18 dec, code 2041 bytes; docs https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/hyperevm/wrapped-hype (immutable WETH9 clone). HyperEVM's gas token is HYPE, so Wrapped HYPE is Enzyme's 'WETH' (ETH-rate anchor) on this chain; the 'ETH/USD' aggregator below is the HYPE/USD feed.",
+      "anchorNote": "Enzyme's WETH_TOKEN is immutable in ValueInterpreter/ComptrollerLib/VaultLib. 'weth' here means the wrapped native token (WHYPE), NOT Ethereum's ETH. Deposits are valued through the HYPE/USD feed."
+    },
+    "usdc": {
+      "address": "0xb88339CB7199b77E23DB6E890353E22632Ba630f",
+      "verified": "two independent sources: (1) rpc: name 'USDC', symbol USDC, 6 dec, code 1798 bytes, totalSupply read 2026-10-02; (2) Circle's published USDC address list, row 'HyperEVM' (mainnet): https://developers.circle.com/stablecoins/usdc-contract-addresses"
+    }
+  },
+  "denominationAsset": "usdc",
+  "release": {
+    "chainlinkStaleRateThresholdSeconds": 172800,
+    "chainlinkStaleRateThresholdNote": "Both registered feeds (HYPE/USD, USDC/USD) have an 86400s heartbeat (Chainlink directory JSON). USDC/USD was observed updating with an 86484s gap (heartbeat + 84s), so a threshold equal to the heartbeat would revert valuation: 2 x 86400 = 172800s tolerates one fully missed heartbeat. Trade-off: because the threshold is global, HYPE/USD (observed max gap 6213s) is accepted up to 48h stale; a depegged/halted stablecoin feed can be up to 48h stale before valuation reverts. The 0.5% deviation trigger bounds normal drift. Only the 8-decimal feed family is used (HyperEVM also lists 18-decimal feeds; never mix them).",
+    "vaultPositionsLimit": 20,
+    "gasRelay": {
+      "verified": "no GSN on HyperEVM known; gas relay disabled",
+      "depositCooldown": 86400,
+      "depositMaxTotal": "1000000000000000000",
+      "feeMaxPercent": 10,
+      "relayFeeMaxBase": 0
+    }
+  },
+  "chainlink": {
+    "ethUsdAggregator": {
+      "address": "0xa5a72eF19F82A579431186402425593a559ed352",
+      "heartbeatSeconds": 86400,
+      "verified": "rpc: description 'HYPE / USD', 8 dec, code 9571 bytes, fresh answer (~91.24 USD, updated 2602s before the read); heartbeat 86400s per Chainlink reference-data-directory JSON https://reference-data-directory.vercel.app/feeds-hyperliquid-mainnet.json. Registered as Enzyme's 'ETH/USD' aggregator because the anchor token is WHYPE.",
+      "observedMaxGapSeconds": 6213,
+      "observation": "61 rounds read on-chain 2026-10-01 (span ~25h); max gap 6213s, median 1234s; heartbeat 86400s per directory JSON"
+    },
+    "primitives": [
+      {
+        "symbol": "USDC",
+        "token": "0xb88339CB7199b77E23DB6E890353E22632Ba630f",
+        "aggregator": "0xA0Adc43ce7AfE3EE7d7eac3C994E178D0620223B",
+        "rateAsset": "USD",
+        "heartbeatSeconds": 86400,
+        "verified": "rpc: description 'USDC / USD', 8 dec, code 9571 bytes, fresh answer (0.99996476, updated 68718s before the read); heartbeat 86400s per directory JSON",
+        "observedMaxGapSeconds": 86484,
+        "observation": "61 rounds read on-chain 2026-10-01; max gap 86484s (heartbeat + 84s), median 86416s"
+      }
+    ]
+  },
+  "features": {
+    "vaultCreation": true,
+    "depositRedeem": true,
+    "swaps": false,
+    "uniswapV3Adapter": false,
+    "uniswapV3SwapRouter02Adapter": false,
+    "paraSwapV6Adapter": false,
+    "oneInchV5Adapter": false,
+    "zeroExV4Adapter": false,
+    "externalPositions": false,
+    "gasRelay": false,
+    "protocolFeeBuyback": false,
+    "phase": 1,
+    "phaseNote": "Phase 1 = vault creation + deposit/redeem only (AC-1, 2, 3, 5, 6), USDC denomination, no adapters. Phase 2 = swaps via the existing UniswapV3Adapter pointed at one chosen original-interface Uniswap v3 fork router (candidates: HyperSwap SwapRouter01, Project X). ParaSwap/1inch/0x adapters are not usable (routers not deployed on HyperEVM)."
+  },
+  "deployment": {
+    "bigBlocksRequired": true,
+    "note": "ComptrollerLib (~5.17M gas), VaultLib (~4.26M) and FundDeployer (~3.96M) exceed HyperEVM's 3M small-block gas limit. A real deployment must send its transactions in big blocks (30M gas, ~1 min cadence): the deployer address must enable the L1 action {\"type\":\"evmUserModify\",\"usingBigBlocks\":true} first. A local Anvil fork cannot enforce the small-block cap; fork runs use a 30M block gas limit."
+  },
+  "excludedTokens": [
+    {
+      "label": "USDT0",
+      "address": "0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb",
+      "reason": "Real stablecoin but not the Circle USDC denomination asset; not registered."
+    },
+    {
+      "label": "USDH",
+      "address": "0x111111a1a0667d36bD57c0A9f569b98057111111",
+      "reason": "Real stablecoin but not the Circle USDC denomination asset; not registered."
+    }
+  ],
+  "todo": [
+    "Swaps are Phase 2: choose one original-interface Uniswap v3 fork router (HyperSwap SwapRouter01 or Project X; exactInput with deadline, selector c04b8d59), verify factory()/WETH9() on-chain, then enable uniswapV3Adapter. SwapRouter02-style routers (including HyperSwap SwapRouter02) need the UniswapV3SwapRouter02Adapter variant.",
+    "Other 8-decimal feeds exist (USDT/USD 0x9114446540B4f8E0E310041981f7c1Be6181Ed07, ETH/USD 0x017151e74fB3a393673B5B5149F53578c0Fa55B0, BTC/USD 0x71A2017296De30F4597B36FBD90b7e8Ec6E97A82) but their token addresses are not registered in Phase 1 (only USDC is accepted); not verified against tokens, so NOT registered.",
+    "WHYPE itself is priced through the HYPE/USD anchor feed; it is not added as a primitive.",
+    "MLN token: none on HyperEVM. Deploy script passes address(0); protocol-fee buyback is unusable.",
+    "GSN relay hub / trusted forwarder: none known, gas relay disabled.",
+    "Big-block operations (who holds the deployer key and enables usingBigBlocks) must be decided before a real deployment."
+  ]
+}

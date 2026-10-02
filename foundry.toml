@@ -21,6 +21,8 @@ fs_permissions = [
     { access = "read-write", path = "./deployments/arbitrum.pending.json" },
     { access = "read-write", path = "./deployments/robinhood.json" },
     { access = "read-write", path = "./deployments/robinhood.pending.json" },
+    { access = "read-write", path = "./deployments/hyperliquid.json" },
+    { access = "read-write", path = "./deployments/hyperliquid.pending.json" },
 ]
 optimizer = true
 optimizer_runs = 200
@@ -46,6 +48,7 @@ polygon = "${ETHEREUM_NODE_POLYGON}"
 arbitrum = "${ETHEREUM_NODE_ARBITRUM}"
 base = "${ETHEREUM_NODE_BASE}"
 robinhood = "${ETHEREUM_NODE_ROBINHOOD}"
+hyperliquid = "${ETHEREUM_NODE_HYPERLIQUID}"
 
 [etherscan]
 mainnet = { key = "${ETHERSCAN_API_KEY_MAINNET}", chain = "mainnet" }

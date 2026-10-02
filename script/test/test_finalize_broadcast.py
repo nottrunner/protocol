@@ -111,9 +111,11 @@ class FinalizeTest(unittest.TestCase):
         rec = fb.finalize("base", node.url, root)
         self.assertEqual((rec["kind"], rec["mainnet"]), ("testnet or unknown network", False))
 
-    def test_hyperevm_is_not_a_known_mainnet_yet(self):
+    def test_hyperevm_is_a_known_mainnet(self):
+        # chain id 999 is on config/mainnet-chain-ids.json (the finalizer reads the real allowlist)
         root, node = self.run_case(999, {})
-        self.assertFalse(fb.finalize("base", node.url, root)["mainnet"])
+        rec = fb.finalize("base", node.url, root)
+        self.assertEqual((rec["kind"], rec["mainnet"]), ("mainnet broadcast", True))
 
     def test_refuses_anvil_node(self):
         root, node = self.run_case(8453, {"is_anvil": True})
@@ -184,6 +186,81 @@ class FinalizeTest(unittest.TestCase):
         root, node = self.run_case(8453, {})
         dump({"mainnet": False, "kind": "fork, not mainnet"}, os.path.join(root, "deployments", "base.json"))
         self.assertEqual(fb.finalize("base", node.url, root)["kind"], "mainnet broadcast")
+
+
+class ChainConfigTests(unittest.TestCase):
+    """config/chains/*.json vs config/mainnet-chain-ids.json and the finalizer's chain choices."""
+
+    CHAINS = ["ethereum", "base", "arbitrum", "robinhood", "hyperliquid"]
+
+    def cfg(self, name):
+        return load_json(os.path.join(REPO, "config", "chains", name + ".json"))
+
+    def test_every_config_chain_id_is_on_the_allowlist_and_unique(self):
+        ids = load_json(os.path.join(REPO, "config", "mainnet-chain-ids.json"))["mainnetChainIds"]
+        seen = set()
+        for c in self.CHAINS:
+            cid = self.cfg(c)["chainId"]
+            self.assertIn(cid, ids, c)
+            self.assertNotIn(cid, seen, c)
+            seen.add(cid)
+        self.assertIn(999, ids)
+
+    def test_every_config_file_is_covered_by_this_test(self):
+        files = sorted(f[:-5] for f in os.listdir(os.path.join(REPO, "config", "chains")) if f.endswith(".json"))
+        self.assertEqual(files, sorted(self.CHAINS))
+
+    def test_finalizer_and_foundry_know_every_chain(self):
+        foundry = open(os.path.join(REPO, "foundry.toml")).read()
+        wrapper = open(os.path.join(REPO, "script", "fork-dry-run.sh")).read()
+        finalizer = open(os.path.join(REPO, "script", "finalize_broadcast.py")).read()
+        for c in self.CHAINS:
+            self.assertIn('"./deployments/%s.json"' % c, foundry)
+            self.assertIn('"./deployments/%s.pending.json"' % c, foundry)
+            self.assertIn('"%s"' % c, finalizer)
+            self.assertIn("%s)" % c, wrapper)
+            self.assertIn(self.cfg(c)["rpc"]["envVar"], open(os.path.join(REPO, ".env.example")).read())
+
+    def test_hyperliquid_phase1(self):
+        c = self.cfg("hyperliquid")
+        self.assertEqual(c["chainId"], 999)
+        self.assertEqual(c["tokens"]["weth"]["address"], "0x5555555555555555555555555555555555555555")  # Wrapped HYPE
+        self.assertEqual(c["tokens"]["usdc"]["address"], "0xb88339CB7199b77E23DB6E890353E22632Ba630f")  # Circle native USDC
+        self.assertEqual(c["denominationAsset"], "usdc")
+        self.assertEqual(c["chainlink"]["ethUsdAggregator"]["address"], "0xa5a72eF19F82A579431186402425593a559ed352")  # HYPE/USD
+        self.assertEqual(c["release"]["chainlinkStaleRateThresholdSeconds"], 172800)
+        f = c["features"]
+        self.assertEqual(f["phase"], 1)
+        self.assertIn("Phase 2", f["phaseNote"])
+        self.assertFalse(f["swaps"])
+        self.assertFalse(any(v for k, v in f.items() if k.endswith("Adapter")))
+        self.assertTrue(c["deployment"]["bigBlocksRequired"])
+        # two independent sources are cited for the denomination asset
+        v = c["tokens"]["usdc"]["verified"]
+        self.assertIn("rpc:", v)
+        self.assertIn("https://developers.circle.com/stablecoins/usdc-contract-addresses", v)
+
+    def test_hyperliquid_fixture_has_two_independent_usdc_sources_and_big_block_gas_limit(self):
+        fx = load_json(os.path.join(REPO, "qa", "fixtures.json"))
+        e = [c for c in fx["chains"] if c["chain"] == "hyperliquid"][0]
+        cfg = self.cfg("hyperliquid")
+        self.assertEqual(e["chainId"], 999)
+        self.assertEqual(e["denominationAsset"]["address"], cfg["tokens"]["usdc"]["address"])
+        srcs = e["denominationAsset"]["sources"]
+        self.assertEqual(len(srcs), 2)
+        self.assertTrue(any("rpc.hyperliquid.xyz/evm" in x for x in srcs))
+        self.assertTrue(any("developers.circle.com/stablecoins/usdc-contract-addresses" in x for x in srcs))
+        self.assertIn("--gas-limit 30000000", e["fork"]["anvilCommand"])
+        self.assertIn("8646", e["fork"]["localRpc"])
+
+    def test_stale_threshold_covers_every_known_heartbeat(self):
+        for name in self.CHAINS:
+            c = self.cfg(name)
+            thr = c["release"]["chainlinkStaleRateThresholdSeconds"]
+            beats = [c["chainlink"]["ethUsdAggregator"].get("heartbeatSeconds")] + [p.get("heartbeatSeconds") for p in c["chainlink"]["primitives"]]
+            beats = [b for b in beats if b is not None]  # Base ETH/USD heartbeat is flagged UNVERIFIED in its config
+            self.assertTrue(beats, name)
+            self.assertGreaterEqual(thr, max(beats), name)
 
 
 if __name__ == "__main__":

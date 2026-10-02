@@ -57,7 +57,7 @@
       }
     ]
   },
-  "warningRepeat": "**WARNING: Fork-funded test accounts only. Do not fund these addresses on mainnet, Base, Arbitrum One, or Robinhood Chain. Do not paste real keys into this repo.**",
+  "warningRepeat": "**WARNING: Fork-funded test accounts only. Do not fund these addresses on mainnet, Base, Arbitrum One, Robinhood Chain, or HyperEVM. Do not paste real keys into this repo.**",
   "chains": [
     {
       "chain": "ethereum",
@@ -141,6 +141,39 @@
         "Foundry tests/scripts alternative: deal(token, account, amount) from forge-std StdCheats.",
         "Do NOT fund or use the token labelled 'USDC' at 0x378F906eAD242F0C3aa9ed45AA07612A2C088030: it is 'Universal Stable Digital Coin' (18 dec), not Circle USDC.",
         "Phase 1 only: create vault, deposit, redeem (AC-1,2,3,5,6). Swaps disabled."
+      ]
+    },
+    {
+      "chain": "hyperliquid",
+      "chainId": 999,
+      "fork": {
+        "source": "anvil --fork-url $ETHEREUM_NODE_HYPERLIQUID",
+        "publicReadOnlyEndpoint": "https://rpc.hyperliquid.xyz/evm",
+        "suggestedLocalPort": 8646,
+        "localRpc": "http://127.0.0.1:8646",
+        "anvilCommand": "anvil --fork-url $ETHEREUM_NODE_HYPERLIQUID --port 8646 --chain-id 999 --gas-limit 30000000 --compute-units-per-second 25 --retries 20 --fork-retry-backoff 1000"
+      },
+      "fundedOn": "local anvil fork of hyperliquid (HyperEVM) only (state lives in the anvil process; nothing is sent to the real network)",
+      "denominationAsset": {
+        "symbol": "USDC",
+        "address": "0xb88339CB7199b77E23DB6E890353E22632Ba630f",
+        "decimals": 6,
+        "sources": [
+          "1. on-chain read via https://rpc.hyperliquid.xyz/evm (eth_getCode + eth_call): name 'USDC', symbol USDC, 6 decimals (read 2026-10-02)",
+          "2. Circle's published USDC contract address list, row 'HyperEVM' (mainnet): https://developers.circle.com/stablecoins/usdc-contract-addresses (fetched 2026-10-02; address matches)"
+        ]
+      },
+      "fundingSteps": [
+        "1. Start the fork: anvil --fork-url $ETHEREUM_NODE_HYPERLIQUID --port 8646 --chain-id 999 --gas-limit 30000000 --compute-units-per-second 25 --retries 20 --fork-retry-backoff 1000   # (public read-only RPC: https://rpc.hyperliquid.xyz/evm). --gas-limit 30000000 is REQUIRED: the fork inherits the 3M small-block gas limit of the fork block, and ComptrollerLib/VaultLib/FundDeployer need the 30M big-block limit (with a 3M fork the core deploy fails with OutOfGas). Anvil cannot enforce the small-block cap; a real deployment needs big blocks enabled for the deployer (L1 action evmUserModify usingBigBlocks=true).",
+        "2. Mine one block once: cast rpc --rpc-url http://127.0.0.1:8646 evm_mine",
+        "3. Native HYPE: cast rpc --rpc-url http://127.0.0.1:8646 anvil_setBalance <account> 0x56BC75E2D63100000   # 100 HYPE",
+        "4a. USDC (denomination asset, 6 dec, Circle native): script/fund-anvil.sh http://127.0.0.1:8646 <account> 0xb88339CB7199b77E23DB6E890353E22632Ba630f 1000000000   # 1000 USDC; verified works, balances slot 9",
+        "4b. WHYPE (wrapped native, 18 dec): cast send --unlocked --from <account> 0x5555555555555555555555555555555555555555 'deposit()' --value 5ether  (verified; impersonate the account first with anvil_impersonateAccount)",
+        "Foundry tests/scripts alternative: deal(token, account, amount) from forge-std StdCheats.",
+        "Do NOT use USDT0 (0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb), USDH (0x111111a1a0667d36bD57c0A9f569b98057111111), Unit-bridged tokens or any other token labelled USDC as the denomination asset.",
+        "Stock anvil does not implement the HyperCore precompiles (0x800..), so reads of them return empty; Enzyme core never calls them.",
+        "Reproduce the committed record: BROADCAST_LOCAL=1 script/fork-dry-run.sh hyperliquid <forkBlock>   (the wrapper starts its own anvil with --gas-limit 30000000 on port 8646; stop any other anvil on that port first)",
+        "Phase 1 only: create vault, deposit, redeem (AC-1,2,3,5,6). Swaps disabled (Phase 2)."
       ]
     }
   ]
