@@ -2,7 +2,7 @@ import { decodeAbiParameters, decodeFunctionData, encodeAbiParameters, encodeFun
 import { describe, expect, it } from "vitest";
 import { augustusV6Abi, comptrollerAbi } from "./abis";
 import {
-  ACTION_SELECTOR, TAKE_ORDER_SELECTOR, applySlippage, decodeAugustusSwapExactAmountIn, encodeCallOnIntegrationArgs, encodeParaSwapAction,
+  ACTION_SELECTOR, TAKE_ORDER_SELECTOR, applySlippage, paraSwapMinOutFloor, quoteWorseBeyondSlippage, decodeAugustusSwapExactAmountIn, encodeCallOnIntegrationArgs, encodeParaSwapAction,
   encodeSwapCallOnExtension, encodeUniPath, encodeUniTakeOrder, quoteParaSwap, selectorFor, uniCandidates, type FetchLike,
 } from "./swap";
 
@@ -144,5 +144,30 @@ describe("ParaSwap v6", () => {
     await expect(
       quoteParaSwap(fetchFn, { chainId: 1, vault: VAULT, tokenIn: USDC, tokenOut: WETH, decimalsIn: 6, decimalsOut: 18, amountIn: BigInt(1), slippageBps: 100 }),
     ).rejects.toThrow(/No routes found/);
+  });
+});
+
+describe("quote safety checks", () => {
+  it("paraSwapMinOutFloor = expected * (1 - slippage), rounded down", () => {
+    expect(paraSwapMinOutFloor(BigInt(10_000), 100)).toBe(BigInt(9_900));
+    expect(paraSwapMinOutFloor(BigInt(303), 100)).toBe(BigInt(299));
+    expect(() => paraSwapMinOutFloor(BigInt(1), 10_000)).toThrow();
+    expect(() => paraSwapMinOutFloor(BigInt(1), -1)).toThrow();
+  });
+  it("quoteParaSwap refuses an API minOut looser than the selected slippage", async () => {
+    const swapData = { srcToken: USDC, destToken: WETH, fromAmount: BigInt(1000), toAmount: BigInt(900), quotedAmount: BigInt(1000), metadata: `0x${"00".repeat(32)}` as const, beneficiary: VAULT };
+    const data = encodeFunctionData({ abi: augustusV6Abi, functionName: "swapExactAmountIn", args: [ADAPTER, swapData, BigInt(0), "0x", "0x"] });
+    const fetchFn: FetchLike = async (url) =>
+      url.includes("/prices") ? { ok: true, status: 200, json: async () => ({ priceRoute: { destAmount: "1000" } }) } : { ok: true, status: 200, json: async () => ({ data }) };
+    const args = { chainId: 1, vault: VAULT, tokenIn: USDC, tokenOut: WETH, decimalsIn: 6, decimalsOut: 18, amountIn: BigInt(1000) };
+    await expect(quoteParaSwap(fetchFn, { ...args, slippageBps: 50 })).rejects.toThrow(/below the selected slippage/); // 900 < 995
+    await expect(quoteParaSwap(fetchFn, { ...args, slippageBps: 1000 })).resolves.toMatchObject({ minOut: BigInt(900) }); // 900 >= 900
+  });
+  it("quoteWorseBeyondSlippage: only a drop larger than the slippage setting blocks sending", () => {
+    expect(quoteWorseBeyondSlippage(BigInt(1000), BigInt(1000), 100)).toBe(false);
+    expect(quoteWorseBeyondSlippage(BigInt(1000), BigInt(1200), 100)).toBe(false); // better
+    expect(quoteWorseBeyondSlippage(BigInt(1000), BigInt(990), 100)).toBe(false); // exactly 1% worse is still within
+    expect(quoteWorseBeyondSlippage(BigInt(1000), BigInt(989), 100)).toBe(true);
+    expect(quoteWorseBeyondSlippage(BigInt(1000), BigInt(999), 0)).toBe(true);
   });
 });

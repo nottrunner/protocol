@@ -7,7 +7,7 @@ import { explorerUrl } from "@/config/chains";
 import { tokensFor } from "@/config/tokens";
 import { formatAmount, safeParseUnits, shortAddress } from "@/lib/format";
 import {
-  errorMessage, SwapSimulationError, useDeployment, useSwap, useTokenInfo, type PortfolioData, type PreparedSwap, type SwapFlowResult, type TokenInfo,
+  errorMessage, quoteWorseBeyondSlippage, SwapSimulationError, useDeployment, useSwap, useTokenInfo, type PortfolioData, type PreparedSwap, type SwapFlowResult, type TokenInfo,
 } from "@/lib/contracts";
 import { Notice } from "./Notice";
 
@@ -88,7 +88,16 @@ export function SwapCard({ portfolio, disabled, onDone }: { portfolio: Portfolio
     try {
       // Re-quote right before sending so minOut is fresh, then execute exactly what was quoted.
       const input = { route: route!, tokenIn: tokenIn!, tokenOut: tokenOut!, amountIn: parsed!, slippageBps: slippage };
+      const shown = prepared; // the quote the user saw and confirmed by pressing Swap
       let fresh = await prepare(input);
+      if (shown && quoteWorseBeyondSlippage(shown.expectedOut, fresh.expectedOut, slippage)) {
+        // Nothing sent: show the new quote and make the user confirm it.
+        setPrepared(fresh);
+        throw new Error(
+          `The quote moved: ${formatAmount(fresh.expectedOut, tokenOut!.decimals)} ${tokenOut!.symbol} now instead of ${formatAmount(shown.expectedOut, tokenOut!.decimals)}. ` +
+          "That is worse than your slippage setting, so nothing was sent. Review the new quote and press Swap again.",
+        );
+      }
       const excluded: string[] = [];
       for (;;) {
         setPrepared(fresh);
@@ -155,7 +164,7 @@ export function SwapCard({ portfolio, disabled, onDone }: { portfolio: Portfolio
         <button className="btn btn-secondary" type="button" disabled={!inputsOk || quoting || pending} onClick={doQuote}>
           {quoting ? "Quoting…" : "Get quote"}
         </button>
-        <button className="btn" type="button" disabled={disabled || !isConnected || !canManage || !inputsOk || pending || quoting} onClick={doSwap}>
+        <button className="btn" type="button" disabled={disabled || !isConnected || !canManage || !inputsOk || !prepared || pending || quoting} onClick={doSwap} title={prepared ? undefined : "Get a quote first"}>
           {pending ? "Swapping…" : "Swap"}
         </button>
       </div>

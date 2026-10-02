@@ -10,8 +10,8 @@ const SLIPPAGE_OPTIONS = [10, 50, 100, 300]; // bps
 
 export function DepositCard({ portfolio, disabled, onDone }: { portfolio: PortfolioData; disabled?: boolean; onDone: () => unknown }) {
   const { isConnected } = useAccount();
-  const { chainId, comptroller, denomination } = portfolio;
-  const { deposit, pending } = useDeposit(chainId, comptroller, denomination.address);
+  const { chainId, vault, comptroller, denomination } = portfolio;
+  const { deposit, pending } = useDeposit(chainId, vault, comptroller, denomination.address);
   const token = useTokenBalance(chainId, denomination.address);
   const [amount, setAmount] = useState("");
   const [slippage, setSlippage] = useState(100);

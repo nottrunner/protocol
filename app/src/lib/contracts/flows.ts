@@ -1,6 +1,7 @@
 import type { Config } from "wagmi";
 import { readContract, simulateContract, waitForTransactionReceipt, writeContract } from "wagmi/actions";
 import type { Address, Hash } from "viem";
+import { assertVerifiedVault } from "./verify";
 import { fundDeployerAbi } from "./abis";
 import { comptrollerAbi, erc20Abi } from "./abis";
 import {
@@ -62,10 +63,12 @@ export type DepositFlowResult = { approveTx?: Hash; buyTx: Hash; sharesReceived:
 /** approve (only if the allowance is short) -> quote -> buyShares(amount, minShares) -> decode SharesBought. */
 export async function depositFlow(
   config: Config,
-  args: { chainId: number; account: Address; comptroller: Address; denominationAsset: Address; amount: bigint; slippageBps: number },
+  args: { chainId: number; account: Address; vault: Address; comptroller: Address; denominationAsset: Address; amount: bigint; slippageBps: number },
 ): Promise<DepositFlowResult> {
-  const { chainId, account, comptroller, denominationAsset, amount, slippageBps } = args;
+  const { chainId, account, vault, comptroller, denominationAsset, amount, slippageBps } = args;
   if (amount <= BigInt(0)) throw new FlowError("Enter an amount greater than zero");
+  // Fail closed BEFORE any approval: the comptroller was read from the vault, so it is only trusted for a Dispatcher-verified vault.
+  await assertVerifiedVault(config, { chainId, vault, comptroller });
   const allowance = await readContract(config, { chainId, address: denominationAsset, abi: erc20Abi, functionName: "allowance", args: [account, comptroller] });
   let approveTx: Hash | undefined;
   if (allowance < amount) {
@@ -88,10 +91,11 @@ export type RedeemFlowResult = { txHash: Hash; sharesRedeemed: bigint; assets: r
 
 export async function redeemFlow(
   config: Config,
-  args: { chainId: number; account: Address; comptroller: Address; redemption: Redemption },
+  args: { chainId: number; account: Address; vault: Address; comptroller: Address; redemption: Redemption },
 ): Promise<RedeemFlowResult> {
-  const { chainId, account, comptroller, redemption } = args;
+  const { chainId, account, vault, comptroller, redemption } = args;
   if (redemption.shares <= BigInt(0)) throw new FlowError("Enter a share amount greater than zero");
+  await assertVerifiedVault(config, { chainId, vault, comptroller });
   const base = { chainId, account, address: comptroller, abi: comptrollerAbi } as const;
   let txHash: Hash;
   if (redemption.mode === "inKind") {

@@ -8,6 +8,7 @@ export const fundDeployerAbi = parseAbi([
   "function createNewFund(address _fundOwner, string _fundName, string _fundSymbol, address _denominationAsset, uint256 _sharesActionTimelock, bytes _feeManagerConfigData, bytes _policyManagerConfigData) returns (address comptrollerProxy_, address vaultProxy_)",
   "function getComptrollerLib() view returns (address)",
   "function releaseIsLive() view returns (bool)",
+  "function getDispatcher() view returns (address)",
   "event NewFundCreated(address indexed creator, address vaultProxy, address comptrollerProxy)",
 ]);
 
@@ -76,3 +77,6 @@ export const integrationManagerAbi = parseAbi([
 export const augustusV6Abi = parseAbi([
   "function swapExactAmountIn(address executor, (address srcToken, address destToken, uint256 fromAmount, uint256 toAmount, uint256 quotedAmount, bytes32 metadata, address beneficiary) swapData, uint256 partnerAndFee, bytes permit, bytes executorData) payable returns (uint256 receivedAmount, uint256 paraswapShare, uint256 partnerShare)",
 ]);
+
+/** Persistent registry of every vault proxy and the FundDeployer that created it (the root of trust for "is this one of ours"). */
+export const dispatcherAbi = parseAbi(["function getFundDeployerForVaultProxy(address _vaultProxy) view returns (address fundDeployer_)"]);

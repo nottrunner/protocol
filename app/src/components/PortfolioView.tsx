@@ -5,7 +5,8 @@ import { isAddress } from "viem";
 import { useAccount } from "wagmi";
 import { explorerUrl, getChain } from "@/config/chains";
 import { formatAmount, shortAddress } from "@/lib/format";
-import { addSaved, loadSavedVaults, storeSavedVaults, usePortfolio, useValuation } from "@/lib/contracts";
+import { addSaved, loadSavedVaults, storeSavedVaults, useDeployment, usePortfolio, useValuation, useVaultVerification } from "@/lib/contracts";
+import { isFeatureEnabled } from "@/config/features";
 import { DeploymentNotices } from "./DeploymentNotices";
 import { DepositCard } from "./DepositCard";
 import { Notice } from "./Notice";
@@ -17,25 +18,29 @@ import { WalletChainGate } from "./WalletChainGate";
 /** Portfolio page body for /portfolio/<chain>/<vault>. All reads use the URL's chain, so a reload renders the same page. */
 export function PortfolioView({ chainId, vault }: { chainId: number; vault: string }) {
   const { isConnected, chainId: walletChainId } = useAccount();
-  const { setReadChainId, can } = useSelectedChain();
+  const { setReadChainId } = useSelectedChain();
   const chain = getChain(chainId);
   const p = usePortfolio(chainId, vault);
   const valuation = useValuation(chainId, p.data);
+  const deployment = useDeployment(chainId);
+  const verification = useVaultVerification(chainId, vault, p.data?.comptroller);
+  const verified = verification.state === "verified";
 
   useEffect(() => {
     setReadChainId(chainId);
   }, [chainId, setReadChainId]);
 
-  // Remember opened vaults so they show up under "My portfolios" (paste fallback / vaults created elsewhere).
+  // Remember opened vaults so they show up under "My portfolios" (paste fallback / vaults created elsewhere): verified ones only.
   useEffect(() => {
-    if (p.data) storeSavedVaults(addSaved(loadSavedVaults(), chainId, p.data.vault));
-  }, [p.data, chainId]);
+    if (p.data && verified) storeSavedVaults(addSaved(loadSavedVaults(), chainId, p.data.vault));
+  }, [p.data, chainId, verified]);
 
   if (!isAddress(vault)) return <Notice kind="error">Invalid vault address.</Notice>;
   const walletOnChain = !isConnected || walletChainId === chainId;
   const d = p.data;
   const v = valuation.data;
   const dd = d?.denomination.decimals ?? 18;
+  const refresh = () => { void p.refetch(); void valuation.refetch(); };
 
   return (
     <>
@@ -97,20 +102,34 @@ export function PortfolioView({ chainId, vault }: { chainId: number; vault: stri
             </tbody>
           </table>
 
-          <div className="grid">
-            {can("deposit") ? (
-              <DepositCard portfolio={d} disabled={!walletOnChain} onDone={() => { void p.refetch(); void valuation.refetch(); }} />
-            ) : (
-              <Notice kind="info">Deposits are not enabled on {chain?.name}.</Notice>
-            )}
-            {can("redeem") ? (
-              <RedeemCard portfolio={d} disabled={!walletOnChain} onDone={() => { void p.refetch(); void valuation.refetch(); }} />
-            ) : (
-              <Notice kind="info">Redemptions are not enabled on {chain?.name}.</Notice>
-            )}
-          </div>
-
-          <SwapCard portfolio={d} disabled={!walletOnChain} onDone={() => { void p.refetch(); void valuation.refetch(); }} />
+          {verification.state === "loading" && <p className="muted" data-testid="vault-verifying">Verifying this vault with the Dispatcher…</p>}
+          {verification.state === "unverified" && (
+            <div className="notice notice-error" role="alert" data-testid="vault-unverified" data-reason={verification.reason}>
+              <strong>Unverified vault.</strong> {verification.message}
+              {verification.detail && <> <span className="muted small">({verification.detail})</span></>}
+              <p>
+                Deposit, redeem and swap are disabled and no token approval can be sent for this address. Only open vaults created
+                through this protocol&apos;s FundDeployer{deployment.fundDeployer ? <> (<code>{deployment.fundDeployer}</code>)</> : null}.
+              </p>
+            </div>
+          )}
+          {verified && (
+            <>
+              <div className="grid">
+                {isFeatureEnabled(chainId, "deposit") ? (
+                  <DepositCard portfolio={d} disabled={!walletOnChain} onDone={refresh} />
+                ) : (
+                  <Notice kind="info">Deposits are not enabled on {chain?.name}.</Notice>
+                )}
+                {isFeatureEnabled(chainId, "redeem") ? (
+                  <RedeemCard portfolio={d} disabled={!walletOnChain} onDone={refresh} />
+                ) : (
+                  <Notice kind="info">Redemptions are not enabled on {chain?.name}.</Notice>
+                )}
+              </div>
+              <SwapCard portfolio={d} disabled={!walletOnChain} onDone={refresh} />
+            </>
+          )}
         </div>
       )}
     </>

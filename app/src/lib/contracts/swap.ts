@@ -5,6 +5,7 @@ import {
 import type { Config } from "wagmi";
 import { readContract, simulateContract, waitForTransactionReceipt, writeContract } from "wagmi/actions";
 import type { SwapAdapter, SwapAdapterKind } from "@/lib/deployments";
+import { assertVerifiedVault } from "./verify";
 import { augustusV6Abi, comptrollerAbi, integrationManagerAbi, quoterV2Abi } from "./abis";
 import { BPS } from "./calls";
 
@@ -130,6 +131,17 @@ export type ParaSwapQuote = { expectedOut: bigint; minOut: bigint; action: ParaS
  * its `toAmount` already contains the requested slippage. The API prices against LIVE chain state, so against a stale local fork
  * the route may revert: the pre-send simulation shows that.
  */
+/** Lowest acceptable `minOut` for a quote: expectedOut * (1 - slippage), rounded down. */
+export function paraSwapMinOutFloor(expectedOut: bigint, slippageBps: number): bigint {
+  if (!Number.isInteger(slippageBps) || slippageBps < 0 || slippageBps >= 10_000) throw new Error("Invalid slippage");
+  return (expectedOut * BigInt(10_000 - slippageBps)) / BigInt(10_000);
+}
+
+/** True if `fresh` is worse than `shown` by more than the slippage setting (the swap must then not be sent without a new confirmation). */
+export function quoteWorseBeyondSlippage(shownExpectedOut: bigint, freshExpectedOut: bigint, slippageBps: number): boolean {
+  return freshExpectedOut < paraSwapMinOutFloor(shownExpectedOut, slippageBps);
+}
+
 export async function quoteParaSwap(
   fetchFn: FetchLike,
   args: { chainId: number; vault: Address; tokenIn: Address; tokenOut: Address; decimalsIn: number; decimalsOut: number; amountIn: bigint; slippageBps: number; apiBase?: string; excludeDexes?: string[] },
@@ -159,12 +171,17 @@ export async function quoteParaSwap(
     throw new Error("ParaSwap returned a route for different tokens");
   }
   if (action.swapData.fromAmount !== args.amountIn) throw new Error("ParaSwap returned a different input amount");
+  // The calldata is built by a third-party API: never accept a minOut looser than the slippage the user chose.
+  const expectedOut = BigInt(prBody.priceRoute.destAmount);
+  if (action.swapData.toAmount < paraSwapMinOutFloor(expectedOut, args.slippageBps)) {
+    throw new Error("ParaSwap returned a minimum output below the selected slippage; refusing to use this quote");
+  }
   const exchanges = [
     ...new Set(
       (prBody.priceRoute.bestRoute ?? []).flatMap((r) => (r.swaps ?? []).flatMap((sw) => (sw.swapExchanges ?? []).map((e) => e.exchange ?? ""))).filter(Boolean),
     ),
   ];
-  return { expectedOut: BigInt(prBody.priceRoute.destAmount), minOut: action.swapData.toAmount, action, priceRouteBlock: prBody.priceRoute.blockNumber, exchanges };
+  return { expectedOut, minOut: action.swapData.toAmount, action, priceRouteBlock: prBody.priceRoute.blockNumber, exchanges };
 }
 
 // ---- prepare + execute ------------------------------------------------------------------------------------------------
@@ -262,9 +279,10 @@ export class SwapSimulationError extends Error {
 
 export async function swapFlow(
   config: Config,
-  args: { chainId: number; account: Address; comptroller: Address; prepared: PreparedSwap },
+  args: { chainId: number; account: Address; vault: Address; comptroller: Address; prepared: PreparedSwap },
 ): Promise<SwapFlowResult> {
-  const { chainId, account, comptroller, prepared } = args;
+  const { chainId, account, vault, comptroller, prepared } = args;
+  await assertVerifiedVault(config, { chainId, vault, comptroller });
   const integrationManager = await readContract(config, { chainId, address: comptroller, abi: comptrollerAbi, functionName: "getIntegrationManager" });
   const callArgs = encodeCallOnIntegrationArgs(prepared.route.address, prepared.selector, prepared.integrationData);
   const callParams = {

@@ -18,12 +18,15 @@ export default function HomePage() {
         <tbody>
           {supportedChains.map((c) => {
             const f = featureFlags[c.id];
+            // Every column is tied to the deployment: without a configured FundDeployer nothing can be created, deposited, redeemed or swapped.
+            const deployed = !!getDeployment(c.id).fundDeployer;
+            const state = (on: boolean) => (!deployed ? "Not deployed" : on ? "Yes" : "No");
             return (
               <tr key={c.id}>
                 <td>{c.name}</td><td>{c.id}</td>
-                <td>{f.create ? "Yes" : "No"}</td>
-                <td>{f.deposit && f.redeem ? "Yes" : "No"}</td>
-                <td>{f.swap && getDeployment(c.id).swapAdapters.length > 0 ? "Yes" : "Not enabled"}</td>
+                <td data-testid={`home-create-${c.id}`}>{state(f.create)}</td>
+                <td data-testid={`home-deposit-${c.id}`}>{state(f.deposit && f.redeem)}</td>
+                <td data-testid={`home-swap-${c.id}`}>{!deployed ? "Not deployed" : f.swap && getDeployment(c.id).swapAdapters.length > 0 ? "Yes" : "Not enabled"}</td>
               </tr>
             );
           })}

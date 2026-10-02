@@ -15,6 +15,7 @@ import { readPortfolio, readTokenInfo, readValuation, type PortfolioData, type T
 import { prepareSwap, swapFlow, type PreparedSwap } from "./swap";
 import type { SwapAdapter } from "@/lib/deployments";
 import { scanLogsPaged, scanStartBlock } from "./listing";
+import { UNVERIFIED_MESSAGES, verifyVault, type UnverifiedReason, type VaultVerification } from "./verify";
 
 /** Public API of the contracts layer. UI code must only use what `@/lib/contracts` re-exports. */
 
@@ -152,6 +153,34 @@ export function usePortfolio(chainId: number, vault: string | undefined) {
   return { valid, data: q.data, isLoading: valid && q.isLoading, isError: !valid || q.isError, error: q.error, refetch: q.refetch };
 }
 
+export type VaultVerificationState =
+  | { state: "loading" }
+  | { state: "verified"; fundDeployer: Address }
+  | { state: "unverified"; reason: UnverifiedReason; message: string; detail?: string };
+
+/**
+ * Dispatcher check for the URL's chain + vault (see verify.ts). Fails closed: only `state === "verified"` may enable a
+ * transaction UI; `loading` and every error / mismatch / unknown state keeps it disabled.
+ */
+export function useVaultVerification(chainId: number, vault: string | undefined, comptroller: Address | undefined): VaultVerificationState {
+  const config = useConfig();
+  const fundDeployer = getChainDeployment(chainId).fundDeployer;
+  const q = useQuery({
+    queryKey: ["vault-verification", chainId, vault?.toLowerCase(), comptroller?.toLowerCase(), fundDeployer?.toLowerCase()],
+    enabled: !!vault && !!fundDeployer && !!comptroller,
+    retry: 0,
+    staleTime: 15_000,
+    queryFn: () => verifyVault(config, { chainId, vault: vault as string, comptroller }),
+  });
+  const wrap = (v: VaultVerification): VaultVerificationState =>
+    v.status === "verified" ? { state: "verified", fundDeployer: v.fundDeployer } : { state: "unverified", reason: v.reason, message: UNVERIFIED_MESSAGES[v.reason], detail: v.detail };
+  if (!vault || !isAddress(vault)) return wrap({ status: "unverified", reason: "invalid-vault" });
+  if (!fundDeployer) return wrap({ status: "unverified", reason: "no-fund-deployer" });
+  if (q.isError) return wrap({ status: "unverified", reason: "dispatcher-error", detail: errorMessage(q.error) });
+  if (!q.data) return { state: "loading" };
+  return wrap(q.data);
+}
+
 /** NAV / share price via eth_call. Router comes from the deployment (record/env); without it only GAV + gross price show. */
 export function useValuation(chainId: number, portfolio: PortfolioData | undefined) {
   const config = useConfig();
@@ -216,25 +245,25 @@ function useWalletFlow<A extends unknown[], R>(chainId: number, feature: "deposi
   return { exec, pending };
 }
 
-export function useDeposit(chainId: number, comptroller: Address | undefined, denominationAsset: Address | undefined) {
+export function useDeposit(chainId: number, vault: Address | undefined, comptroller: Address | undefined, denominationAsset: Address | undefined) {
   const run = useCallback(
     (config: Config, account: Address, amount: bigint, slippageBps: number) => {
-      if (!comptroller || !denominationAsset) throw new Error("Vault not ready");
-      return depositFlow(config, { chainId, account, comptroller, denominationAsset, amount, slippageBps });
+      if (!vault || !comptroller || !denominationAsset) throw new Error("Vault not ready");
+      return depositFlow(config, { chainId, account, vault, comptroller, denominationAsset, amount, slippageBps });
     },
-    [chainId, comptroller, denominationAsset],
+    [chainId, vault, comptroller, denominationAsset],
   );
   const { exec, pending } = useWalletFlow(chainId, "deposit", run);
   return { deposit: exec, pending };
 }
 
-export function useRedeem(chainId: number, comptroller: Address | undefined) {
+export function useRedeem(chainId: number, vault: Address | undefined, comptroller: Address | undefined) {
   const run = useCallback(
     (config: Config, account: Address, redemption: Redemption) => {
-      if (!comptroller) throw new Error("Vault not ready");
-      return redeemFlow(config, { chainId, account, comptroller, redemption });
+      if (!vault || !comptroller) throw new Error("Vault not ready");
+      return redeemFlow(config, { chainId, account, vault, comptroller, redemption });
     },
-    [chainId, comptroller],
+    [chainId, vault, comptroller],
   );
   const { exec, pending } = useWalletFlow(chainId, "redeem", run);
   return { redeem: exec, pending };
@@ -283,7 +312,7 @@ export function useSwap(portfolio: PortfolioData | undefined) {
       if (walletChainId !== portfolio.chainId) throw new Error(`Switch your wallet to ${getChain(portfolio.chainId)?.name ?? portfolio.chainId} first`);
       setPending(true);
       try {
-        return await swapFlow(config, { chainId: portfolio.chainId, account: address, comptroller: portfolio.comptroller, prepared });
+        return await swapFlow(config, { chainId: portfolio.chainId, account: address, vault: portfolio.vault, comptroller: portfolio.comptroller, prepared });
       } finally {
         setPending(false);
       }

@@ -10,8 +10,8 @@ type Mode = "inKind" | "denomination";
 
 export function RedeemCard({ portfolio, disabled, onDone }: { portfolio: PortfolioData; disabled?: boolean; onDone: () => unknown }) {
   const { address, isConnected } = useAccount();
-  const { chainId, comptroller, denomination, holdings } = portfolio;
-  const { redeem, pending } = useRedeem(chainId, comptroller);
+  const { chainId, vault, comptroller, denomination, holdings } = portfolio;
+  const { redeem, pending } = useRedeem(chainId, vault, comptroller);
   const [amount, setAmount] = useState("");
   const [mode, setMode] = useState<Mode>("inKind");
   const [result, setResult] = useState<RedeemFlowResult & { before: PortfolioData["holdings"] }>();

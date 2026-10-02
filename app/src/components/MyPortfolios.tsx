@@ -7,7 +7,7 @@ import { isAddress, type Address } from "viem";
 import { useAccount, useConfig } from "wagmi";
 import { chainIdFromParam, portfolioPath } from "@/config/chains";
 import {
-  addSaved, loadSavedVaults, readPortfolio, removeSaved, storeSavedVaults, useMyPortfolios, type SavedVaults,
+  loadSavedVaults, readPortfolio, removeSaved, storeSavedVaults, useDeployment, useMyPortfolios, type SavedVaults,
 } from "@/lib/contracts";
 import { DeploymentNotices } from "./DeploymentNotices";
 import { Notice } from "./Notice";
@@ -24,6 +24,7 @@ export function MyPortfolios() {
   const { address, isConnected } = useAccount();
   const { chainId, chain } = useSelectedChain();
   const my = useMyPortfolios(chainId, address);
+  const protocolDeployed = !!useDeployment(chainId).fundDeployer;
   const [saved, setSaved] = useState<SavedVaults>({});
   const [input, setInput] = useState("");
   const [err, setErr] = useState<string>();
@@ -48,10 +49,8 @@ export function MyPortfolios() {
     if (!isAddress(v)) return setErr("Not a valid address");
     setBusy(true);
     try {
-      await readPortfolio(config, { chainId, vault: v as Address }); // proves it is a vault on this chain before saving/opening
-      const next = addSaved(loadSavedVaults(), chainId, v);
-      storeSavedVaults(next);
-      setSaved(next);
+      await readPortfolio(config, { chainId, vault: v as Address }); // proves it looks like a vault on this chain before opening
+      // Not saved here: the portfolio page saves a vault only after the Dispatcher has verified it.
       router.push(portfolioPath(chainId, v));
     } catch {
       setErr(`No vault found at this address on ${chain?.name}. Check the address and network.`);
@@ -96,14 +95,17 @@ export function MyPortfolios() {
       </ul>
 
       <h2>Open a portfolio by vault address</h2>
+      {!protocolDeployed && (
+        <Notice kind="warn"><span data-testid="paste-disabled">Protocol not deployed on {chain?.name}: vaults cannot be verified, so opening a vault by address is disabled.</span></Notice>
+      )}
       <form className="row" onSubmit={open}>
-        <input className="grow" name="vaultAddress" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Vault (VaultProxy) address 0x…" spellCheck={false} aria-label="Vault address" />
-        <button className="btn" type="submit" disabled={!isAddress(input.trim()) || busy}>{busy ? "Checking…" : "Open"}</button>
+        <input className="grow" name="vaultAddress" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Vault (VaultProxy) address 0x…" spellCheck={false} aria-label="Vault address" disabled={!protocolDeployed} />
+        <button className="btn" type="submit" disabled={!protocolDeployed || !isAddress(input.trim()) || busy}>{busy ? "Checking…" : "Open"}</button>
       </form>
       {err && <Notice kind="error">{err}</Notice>}
       <p className="muted small">
         Listing finds portfolios you <em>created</em> (the event&apos;s indexed creator). Portfolios created by someone else for you, or
-        beyond the RPC&apos;s log range, can be opened by pasting the vault address; opened vaults are remembered in this browser.
+        beyond the RPC&apos;s log range, can be opened by pasting the vault address; vaults you open are remembered in this browser once the Dispatcher has verified them. The page only enables deposit / redeem / swap for verified vaults.
       </p>
     </>
   );

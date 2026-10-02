@@ -17,10 +17,14 @@ export {
   useMyPortfolios,
   usePortfolio,
   useValuation,
+  useVaultVerification,
 } from "./hooks";
+export type { VaultVerificationState } from "./hooks";
+export { UNVERIFIED_MESSAGES, UnverifiedVaultError, evaluateVaultVerification, verifyVault } from "./verify";
+export type { UnverifiedReason, VaultVerification } from "./verify";
 export type { MyPortfolio, CreatePortfolioInput, CreatePortfolioResult, DenominationStatus, DeploymentHealth } from "./hooks";
 export type { PreparedSwap, SwapFlowResult } from "./swap";
-export { SwapSimulationError } from "./swap";
+export { SwapSimulationError, quoteWorseBeyondSlippage } from "./swap";
 export type { PrepareSwapInput } from "./hooks";
 export { readPortfolio, readValuation, previewInKindRedemption } from "./portfolio";
 export type { Holding, PortfolioData, TokenInfo, Valuation } from "./portfolio";
