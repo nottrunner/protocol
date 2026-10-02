@@ -45,7 +45,9 @@ jobs:
       - name: Install foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: stable
+          # Pinned to what `stable` resolved to in CI (forge 1.8.4, commit 50af4efe) so that
+          # a new Foundry release cannot silently change fmt/compile/test results.
+          version: v1.8.4
 
       - name: Display config
         run: forge config
