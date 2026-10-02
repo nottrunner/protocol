@@ -10,6 +10,11 @@ on:
       - v[1-9]*
       - audit/*
       - dev
+    # Skip Verify only when EVERY changed file matches one of these patterns
+    # (GitHub semantics for paths-ignore). Any other changed file runs Verify in full.
+    paths-ignore:
+      - 'app/**'
+      - '.github/workflows/app-ci.yaml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
