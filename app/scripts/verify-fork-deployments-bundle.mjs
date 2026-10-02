@@ -3,7 +3,7 @@
 //   node scripts/verify-fork-deployments-bundle.mjs absent  <dir-with-fork-records> [buildDir=.next]  -> exit 1 if found
 //   node scripts/verify-fork-deployments-bundle.mjs present <dir-with-fork-records> [buildDir=.next]  -> exit 1 if missing
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 
 const mode = process.argv[2];
 const recordsDir = process.argv[3];
@@ -44,19 +44,21 @@ if (files.length === 0) {
 }
 const hits = new Map();
 // The flag's own name must not appear as a string literal in a default bundle either (the flag read itself is inlined
-// by Next via next.config `env`, so only a stray literal, e.g. in a diagnostic message, could leak it).
+// by Next via next.config `env`, so only a stray literal, e.g. in a diagnostic message, could leak it). Checked in the
+// client output (.next/static, served to browsers) only: server-side files such as required-server-files.json legitimately
+// echo next.config's `env` keys and are never sent to the client.
 const FLAG_NAME = "use_fork_deployments";
 let flagLiteralFiles = 0;
 for (const f of files) {
   const text = readFileSync(f, "utf8").toLowerCase();
-  if (text.includes(FLAG_NAME)) flagLiteralFiles++;
+  if (f.split(sep).includes("static") && text.includes(FLAG_NAME)) flagLiteralFiles++;
   for (const [addr, label] of markers) if (text.includes(addr)) hits.set(label, (hits.get(label) ?? 0) + 1);
 }
 console.log(`scanned ${files.length} files under ${root}; ${markers.size} fork-record addresses checked`);
 console.log(`  ${hits.size} of ${markers.size} markers found`);
-if (mode === "absent") console.log(`  flag name literal (USE_FORK_DEPLOYMENTS) found in ${flagLiteralFiles} files`);
+if (mode === "absent") console.log(`  flag name literal (USE_FORK_DEPLOYMENTS) found in ${flagLiteralFiles} client files (.next/static)`);
 if (mode === "absent" && flagLiteralFiles > 0) {
-  console.error("FAIL: the string USE_FORK_DEPLOYMENTS is present in the default build output.");
+  console.error("FAIL: the string USE_FORK_DEPLOYMENTS is present in the client bundle (.next/static) of a default build.");
   process.exit(1);
 }
 if (mode === "absent" && hits.size > 0) {
