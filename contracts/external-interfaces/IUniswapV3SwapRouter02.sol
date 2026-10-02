@@ -15,7 +15,8 @@ pragma experimental ABIEncoderV2;
 /// @title IUniswapV3SwapRouter02 Interface
 /// @author Enzyme Foundation <security@enzyme.finance>
 /// @dev Minimal interface for our interactions with Uniswap's SwapRouter02 (IV3SwapRouter).
-/// Unlike the original SwapRouter (see IUniswapV3SwapRouter), `ExactInputParams` has no `deadline` field.
+/// Unlike the original SwapRouter (see IUniswapV3SwapRouter), `ExactInputParams` has no `deadline` field, so
+/// deadline protection is unavailable through this router.
 interface IUniswapV3SwapRouter02 {
     struct ExactInputParams {
         bytes path;

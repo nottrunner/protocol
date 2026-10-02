@@ -21,6 +21,9 @@ import {UniswapV3Adapter} from "./UniswapV3Adapter.sol";
 /// @dev Identical to UniswapV3Adapter, except that `exactInput()` is called with the SwapRouter02 ABI
 /// (no `deadline` in `ExactInputParams`). Use this variant on chains where only SwapRouter02 is deployed
 /// (e.g., Base, Robinhood Chain). Use UniswapV3Adapter with the original SwapRouter (e.g., Ethereum, Arbitrum).
+/// @dev DEADLINE WARNING: SwapRouter02's `exactInput()` has no `deadline` parameter, so this variant provides NO
+/// deadline protection (the original adapter passes `block.timestamp + 1`, which is only a same-block guard in any case).
+/// A swap included late is protected solely by `minIncomingAssetAmount` (slippage), so callers must set it tightly.
 contract UniswapV3SwapRouter02Adapter is UniswapV3Adapter {
     constructor(address _integrationManager, address _router) public UniswapV3Adapter(_integrationManager, _router) {}
 

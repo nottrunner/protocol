@@ -18,7 +18,9 @@ import {AdapterBase} from "../utils/0.6.12/AdapterBase.sol";
 
 /// @title UniswapV3SwapAdapter Contract
 /// @author Enzyme Foundation <security@enzyme.finance>
-/// @notice Adapter for interacting with UniswapV3 swaps
+/// @notice Adapter for interacting with UniswapV3 swaps via the original SwapRouter
+/// @dev For routers without a `deadline` in `exactInput` (SwapRouter02, e.g. Base) use UniswapV3SwapRouter02Adapter,
+/// which has no deadline protection.
 contract UniswapV3Adapter is AdapterBase, UniswapV3ActionsMixin {
     constructor(address _integrationManager, address _router)
         public
