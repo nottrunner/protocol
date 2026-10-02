@@ -184,7 +184,15 @@ contract DeployCore is Script {
         vm.serializeString(o, "runKind", runKind);
         vm.serializeString(o, "chain", _c.chain);
         vm.serializeUint(o, "chainId", block.chainid);
-        vm.serializeUint(o, "blockNumberAtDeploy", block.number);
+        // Chain-native block number (eth_blockNumber). `block.number` inside the EVM is the L1 block number on
+        // Arbitrum-stack chains (Arbitrum, Robinhood), so both are recorded; forkBlock is also chain-native.
+        vm.serializeUint(o, "blockNumberAtDeploy", chainBlockNumber());
+        vm.serializeUint(o, "evmBlockNumberAtDeploy", block.number);
+        vm.serializeString(
+            o,
+            "blockNumberNote",
+            "blockNumberAtDeploy and forkBlock are chain-native block numbers (eth_blockNumber; L2 blocks on arbitrum/robinhood). evmBlockNumberAtDeploy is block.number as seen inside the EVM (the L1 block number on arbitrum/robinhood)."
+        );
         vm.serializeUint(o, "forkBlock", vm.envOr("FORK_BLOCK", uint256(0)));
         vm.serializeUint(o, "blockTimestampAtDeploy", block.timestamp);
         vm.serializeAddress(o, "deployer", msg.sender);
@@ -196,6 +204,14 @@ contract DeployCore is Script {
         string memory out = vm.serializeString(o, "addresses", addrJson);
         vm.writeJson(out, path);
         console2.log("wrote", path);
+    }
+
+    /// @dev Chain-native block number via eth_blockNumber (vm.rpc returns the big-endian bytes of the quantity).
+    function chainBlockNumber() internal returns (uint256 n_) {
+        bytes memory r = VmRpc(address(vm)).rpc("eth_blockNumber", "[]");
+        for (uint256 i; i < r.length; i++) {
+            n_ = (n_ << 8) | uint8(r[i]);
+        }
     }
 
     function upper(string memory _s) internal pure returns (string memory) {

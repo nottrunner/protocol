@@ -94,11 +94,18 @@ Both write to `deployments/<chain>.json`, so a later real broadcast **overwrites
 `"mainnet broadcast"`, `mainnet` to `true`, `label` to `REAL BROADCAST DEPLOYMENT`). `script/fork-dry-run.sh` refuses to overwrite a record
 with `"mainnet": true`. Review the `kind`/`mainnet` fields (and `git diff`) before committing a record.
 
-Fields: `kind`, `mainnet`, `label`, `runKind`, `chain`, `chainId`, `forkBlock` (0 for a broadcast), `blockNumberAtDeploy`, `blockTimestampAtDeploy`,
+Fields: `kind`, `mainnet`, `label`, `runKind`, `chain`, `chainId`, `forkBlock` (0 for a broadcast), `blockNumberAtDeploy`, `evmBlockNumberAtDeploy`, `blockNumberNote`, `blockTimestampAtDeploy`,
 `deployer`, `chainlinkStaleRateThresholdSeconds`, `denominationAsset` (`symbol`, `address`), `scriptCommit` (git SHA of the script at run time),
 `scriptTreeDirty`, `configSha256`, `addresses`; fork records also carry `log` (path + SHA-256 of `deployments/logs/<chain>.fork-run.txt`)
 and `reproduce`. The addresses of a fork record exist only on a throwaway local fork; nothing was broadcast. No keys are involved (Anvil
 account #0 *address* only; `forge script` runs without `--broadcast`).
+
+Block numbers: `forkBlock` and `blockNumberAtDeploy` are **chain-native** (`eth_blockNumber`), i.e. L2 blocks on Arbitrum and Robinhood.
+`evmBlockNumberAtDeploy` is `block.number` as seen inside the EVM, which is the *L1* block number on those two chains (Arbitrum semantics).
+
+To keep a QA deployment alive on a local fork (so fixtures/apps can use it) run the script against the running Anvil with the fork kind and
+Anvil's unlocked account: `RUN_KIND=fork ... forge script ... --rpc-url http://127.0.0.1:<port> --sender 0xf39F... --unlocked --broadcast`.
+`RUN_KIND=broadcast` is refused on Anvil, so such a run can never be labelled a real deployment.
 
 Reproduce a fork record (needs `forge`/`anvil`, `python3`, `jq`, a clean checkout of `scriptCommit`):
 ```bash
