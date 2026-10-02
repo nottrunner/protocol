@@ -7,7 +7,7 @@ const FIX = join(__dirname, "__fixtures__");
 const read = (p: string) => JSON.parse(readFileSync(join(FIX, p), "utf8")) as Record<string, unknown>;
 const CHAINS = { ethereum: 1, base: 8453, arbitrum: 42161, robinhood: 4663 } as const;
 const forkRecords = Object.fromEntries(Object.entries(CHAINS).map(([n, id]) => [String(id), read(`fork-samples/${n}.json`)]));
-const mainnetLike = (chain: keyof typeof CHAINS, extra: Record<string, unknown> = {}) => ({
+const mainnetLike = (chain: keyof typeof CHAINS, extra: Record<string, unknown> = {}): Record<string, unknown> => ({
   ...read(`fork-samples/${chain}.json`),
   kind: "mainnet broadcast", mainnet: true, runKind: "broadcast", forkBlock: 0, label: "REAL BROADCAST DEPLOYMENT", ...extra,
 });

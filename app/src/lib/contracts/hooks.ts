@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { isAddress, parseEventLogs, type Address, type Hash } from "viem";
-import { useAccount, usePublicClient, useReadContract, useReadContracts, useWriteContract } from "wagmi";
+import { isAddress, type Address, type Hash } from "viem";
+import { useAccount, useBytecode, useConfig, usePublicClient, useReadContract, useReadContracts, useWriteContract } from "wagmi";
 import { isFeatureEnabled } from "@/config/features";
-import { comptrollerAbi, erc20Abi, fundDeployerAbi, vaultAbi } from "./abis";
-import { supportedChainIds } from "@/config/chains";
+import { comptrollerAbi, erc20Abi, fundDeployerAbi, valueInterpreterAbi, vaultAbi } from "./abis";
+import { getChain, supportedChainIds } from "@/config/chains";
 import { getChainDeployment, getFundDeployer } from "./addresses";
+import { createPortfolioFlow } from "./flows";
 
 /** Public API of the contracts layer. UI code must only use what `@/lib/contracts` re-exports. */
 
@@ -19,49 +20,114 @@ export type CreatePortfolioInput = {
   sharesActionTimelock?: bigint;
 };
 
-export type CreatePortfolioResult = { txHash: Hash; vaultProxy?: Address; comptrollerProxy?: Address };
+export type CreatePortfolioResult = { txHash: Hash; vaultProxy: Address; comptrollerProxy: Address; owner: Address };
+
+/** Short, human message from a viem/wagmi error (first line; prefers viem's `shortMessage`). */
+export function errorMessage(err: unknown): string {
+  if (err && typeof err === "object") {
+    const e = err as { shortMessage?: string; message?: string };
+    const m = e.shortMessage ?? e.message;
+    if (m) return m.split("\n")[0] ?? m;
+  }
+  return "Transaction failed";
+}
 
 export function useCreatePortfolio() {
-  const { address } = useAccount();
-  const { writeContractAsync } = useWriteContract();
+  const { address, chainId: walletChainId } = useAccount();
   const [pending, setPending] = useState(false);
-  const publicClient = usePublicClient();
+  const config = useConfig();
 
   const create = useCallback(
     async (input: CreatePortfolioInput): Promise<CreatePortfolioResult> => {
       if (!address) throw new Error("Connect a wallet first");
       if (!isFeatureEnabled(input.chainId, "create")) throw new Error("Portfolio creation is disabled on this chain");
+      if (walletChainId !== input.chainId) throw new Error(`Switch your wallet to ${getChain(input.chainId)?.name ?? input.chainId} first`);
       const fundDeployer = getFundDeployer(input.chainId);
-      if (!fundDeployer) throw new Error("FundDeployer address not configured for this chain yet");
+      if (!fundDeployer) throw new Error("Protocol not deployed on this chain");
       setPending(true);
       try {
-        const txHash = await writeContractAsync({
-          chainId: input.chainId,
-          address: fundDeployer,
-          abi: fundDeployerAbi,
-          functionName: "createNewFund",
-          args: [
-            address,
-            input.name,
-            input.symbol,
-            input.denominationAsset,
-            input.sharesActionTimelock ?? BigInt(0),
-            "0x", // TODO(fees): fee config encoding (FeeManager) once fee UX is designed
-            "0x", // TODO(policies): policy config encoding (PolicyManager) once policy UX is designed
-          ],
+        // fees / policies are not configurable in the UI yet: empty config = no fees, no policies
+        return await createPortfolioFlow(config, {
+          chainId: input.chainId, account: address, fundDeployer, name: input.name, symbol: input.symbol,
+          denominationAsset: input.denominationAsset, sharesActionTimelock: input.sharesActionTimelock,
         });
-        const receipt = await publicClient?.waitForTransactionReceipt({ hash: txHash });
-        const logs = receipt ? parseEventLogs({ abi: fundDeployerAbi, eventName: "NewFundCreated", logs: receipt.logs }) : [];
-        const evt = logs[0]?.args;
-        return { txHash, vaultProxy: evt?.vaultProxy, comptrollerProxy: evt?.comptrollerProxy };
       } finally {
         setPending(false);
       }
     },
-    [address, publicClient, writeContractAsync],
+    [address, config, walletChainId],
   );
 
   return { create, pending };
+}
+
+export type DenominationStatus = "idle" | "loading" | "supported" | "unsupported" | "unknown";
+
+/**
+ * Checks that `asset` can be a denomination asset on this chain: `FundDeployer.createNewFund` -> `ComptrollerLib.init` requires
+ * `ValueInterpreter.isSupportedPrimitiveAsset(asset)` ("init: Bad denomination asset" otherwise). The ValueInterpreter comes
+ * from the deployment record / env, else from `FundDeployer.getComptrollerLib().getValueInterpreter()`. Also reads
+ * symbol/decimals so amounts are always formatted with the token's real decimals.
+ */
+export function useDenominationCheck(chainId: number, asset: Address | undefined) {
+  const deployment = getChainDeployment(chainId);
+  const fundDeployer = deployment.fundDeployer ?? undefined;
+  const recordVi = deployment.addresses.valueInterpreter;
+
+  const lib = useReadContract({
+    chainId, address: fundDeployer, abi: fundDeployerAbi, functionName: "getComptrollerLib",
+    query: { enabled: !!fundDeployer && !recordVi },
+  });
+  const discoveredVi = useReadContract({
+    chainId, address: lib.data, abi: comptrollerAbi, functionName: "getValueInterpreter",
+    query: { enabled: !!lib.data && !recordVi },
+  });
+  const valueInterpreter = recordVi ?? discoveredVi.data;
+
+  const reads = useReadContracts({
+    allowFailure: true,
+    query: { enabled: !!asset },
+    contracts: [
+      { chainId, address: valueInterpreter, abi: valueInterpreterAbi, functionName: "isSupportedPrimitiveAsset", args: [asset ?? "0x0000000000000000000000000000000000000000"] },
+      { chainId, address: asset, abi: erc20Abi, functionName: "symbol" },
+      { chainId, address: asset, abi: erc20Abi, functionName: "decimals" },
+    ],
+  });
+  const [supported, symbol, decimals] = reads.data ?? [];
+  let status: DenominationStatus = "idle";
+  if (asset) {
+    if (reads.isLoading || (!valueInterpreter && (lib.isLoading || discoveredVi.isLoading))) status = "loading";
+    else if (!valueInterpreter || supported?.status !== "success") status = "unknown";
+    else status = supported.result ? "supported" : "unsupported";
+  }
+  return {
+    status,
+    valueInterpreter,
+    symbol: symbol?.status === "success" ? (symbol.result as string) : undefined,
+    decimals: decimals?.status === "success" ? Number(decimals.result) : undefined,
+  };
+}
+
+export type DeploymentHealth = "checking" | "ok" | "no-code" | "not-live" | "unreachable" | "none";
+
+/**
+ * Is the configured FundDeployer really there? Catches the classic QA mistake of a build pointed at addresses from a fork
+ * while the RPC for that chain is not the fork (no code at the address), and a release that has not been set live.
+ */
+export function useDeploymentHealth(chainId: number): DeploymentHealth {
+  const fundDeployer = getFundDeployer(chainId) ?? undefined;
+  const code = useBytecode({ chainId, address: fundDeployer, query: { enabled: !!fundDeployer, retry: 1 } });
+  const live = useReadContract({
+    chainId, address: fundDeployer, abi: fundDeployerAbi, functionName: "releaseIsLive",
+    query: { enabled: !!fundDeployer && !!code.data && code.data !== "0x", retry: 1 },
+  });
+  if (!fundDeployer) return "none";
+  if (code.isLoading) return "checking";
+  if (code.isError) return "unreachable";
+  if (!code.data || code.data === "0x") return "no-code";
+  if (live.isLoading) return "checking";
+  if (live.data === false) return "not-live";
+  return "ok";
 }
 
 export function useVault(chainId: number, vault: string | undefined) {
