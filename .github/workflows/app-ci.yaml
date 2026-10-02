@@ -1,7 +1,7 @@
 name: App CI
 on:
   pull_request:
-    branches: [dev]
+    branches: [dev, "feat/app-**"]   # stacked app PRs target feat/app-* branches
     paths:
       - "app/**"
       - ".github/workflows/app-ci.yaml"
