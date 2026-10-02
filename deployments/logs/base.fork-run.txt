@@ -1,0 +1,50 @@
+No files changed, compilation skipped
+Script ran successfully.
+
+== Return ==
+p_: struct DeployCore.Persistent Persistent({ dispatcher: 0x6cEE3AC97C67E0B39238fb564faf10218C59a6e9, addressListRegistry: 0x48D705f1d64E7Ffe3EFcE15D8d8061b20aB4C929, externalPositionFactory: 0xce3774eE9D08a2532B7Ff4b1B2aa0529a66f3B07, globalConfigProxy: 0x17434891234feAe6a4389A26Fa566c2610a1b156, protocolFeeReserveProxy: 0xA19c9bC872a46Ad2B3EED81ec43349F8DB8f8D9F, uintListRegistry: 0xa5B8e16F3f25Ba623d26D7C0864A1b798A13c162, fundValueCalculatorRouter: 0x99de02aF14C9bb491540cc0a29594aF07a6cA4d1 })
+r_: struct DeployCore.Release Release({ gasRelayPaymasterFactory: 0x193570f6D9eBA8aa520b8F2243EA2fF4c4555e01, fundDeployer: 0x26b8af9c63f88044D0a842536Cd7661C4FC53F83, protocolFeeTracker: 0x910fe3cbAbb23DD5Bb86dB4fB1E2A8872afFc92B, valueInterpreter: 0xe9388c7B36931ca983751F065C69a3ACA7195CBB, policyManager: 0x5A8d6042B0F36a5b4BF30894F16E558E46D5f922, externalPositionManager: 0xF1CB82EF2c15c29C3a0EAc7154fE1956AFB16a99, feeManager: 0x0BbFf66C00821d1e77507B739eFc348Ec8eb287D, integrationManager: 0x523609B8AbDD37EcbA4f8BD7C504f205359c4df5, comptrollerLib: 0x9006EfE7f9BdAc9a9a411A1c2d942CAf9E18f1d7, vaultLib: 0xa574068D02f662BB73C7bE69280c13Bb552F92b0, fundValueCalculator: 0x5BF7b52B1F7782d8B5f76040de2aB02f9E5E0c4a })
+
+== Logs ==
+  1 WETH in first primitive (raw units): 2745537653
+  == DeployCore: base chainid 8453
+  dispatcher 0x6cEE3AC97C67E0B39238fb564faf10218C59a6e9
+  addressListRegistry 0x48D705f1d64E7Ffe3EFcE15D8d8061b20aB4C929
+  externalPositionFactory 0xce3774eE9D08a2532B7Ff4b1B2aa0529a66f3B07
+  globalConfigProxy 0x17434891234feAe6a4389A26Fa566c2610a1b156
+  protocolFeeReserveProxy 0xA19c9bC872a46Ad2B3EED81ec43349F8DB8f8D9F
+  uintListRegistry 0xa5B8e16F3f25Ba623d26D7C0864A1b798A13c162
+  fundValueCalculatorRouter 0x99de02aF14C9bb491540cc0a29594aF07a6cA4d1
+  gasRelayPaymasterFactory 0x193570f6D9eBA8aa520b8F2243EA2fF4c4555e01
+  fundDeployer 0x26b8af9c63f88044D0a842536Cd7661C4FC53F83
+  protocolFeeTracker 0x910fe3cbAbb23DD5Bb86dB4fB1E2A8872afFc92B
+  valueInterpreter 0xe9388c7B36931ca983751F065C69a3ACA7195CBB
+  policyManager 0x5A8d6042B0F36a5b4BF30894F16E558E46D5f922
+  externalPositionManager 0xF1CB82EF2c15c29C3a0EAc7154fE1956AFB16a99
+  feeManager 0x0BbFf66C00821d1e77507B739eFc348Ec8eb287D
+  integrationManager 0x523609B8AbDD37EcbA4f8BD7C504f205359c4df5
+  comptrollerLib 0x9006EfE7f9BdAc9a9a411A1c2d942CAf9E18f1d7
+  vaultLib 0xa574068D02f662BB73C7bE69280c13Bb552F92b0
+  fundValueCalculator 0x5BF7b52B1F7782d8B5f76040de2aB02f9E5E0c4a
+  wrote deployments/base.json
+
+## Setting up 1 EVM.
+
+==========================
+
+Chain 8453
+
+Estimated max fee per gas: 0.01098785 gwei
+Estimated base fee per gas: 0.004993925 gwei
+Estimated max priority fee per gas: 0.001 gwei
+
+Estimated total gas used for script: 48563211
+
+Estimated amount required: 0.00053360527798635 ETH
+
+==========================
+
+SIMULATION COMPLETE. To broadcast these transactions, add --broadcast and wallet configuration(s) to the previous command. See forge script --help for more.
+
+
+

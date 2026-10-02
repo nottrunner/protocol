@@ -1,0 +1,98 @@
+{
+  "_readme": "No keys or RPC URLs with API keys belong in this file. 'verified' notes say how each address was checked (rpc = on-chain read on 2026-10-01; web = cited page; repo = repo test config). Omitted keys are unknown and read as address(0) by the deploy scripts; see 'todo'.",
+  "name": "base",
+  "chainId": 8453,
+  "rpc": {
+    "envVar": "ETHEREUM_NODE_BASE",
+    "foundryAlias": "base",
+    "publicEndpointForReadsOnly": "https://base-rpc.publicnode.com"
+  },
+  "tokens": {
+    "weth": {
+      "address": "0x4200000000000000000000000000000000000006",
+      "verified": "rpc: symbol WETH, 18 dec; OP-stack predeploy"
+    },
+    "usdc": {
+      "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "verified": "rpc: symbol USDC, 6 dec; matches repo BASE_USDC (Circle native)"
+    },
+    "mln": {
+      "address": "0x7C298664BD6582f6f264c2Cb5a4B9cC09b6E3889",
+      "verified": "rpc: symbol MLN, 18 dec; but no Chainlink MLN feed (repo BASE_MLN_ETH_AGGREGATOR is TODO) so MLN is not registered as a primitive"
+    }
+  },
+  "denominationAsset": "usdc",
+  "release": {
+    "chainlinkStaleRateThresholdSeconds": 172800,
+    "chainlinkStaleRateThresholdNote": "172800s (48h) sized for the SLOWEST registered feed. Slowest = USDC/USD: heartbeat 86400s, max observed gap 86490s (it updates at ~heartbeat+30..90s, so a threshold only just above the heartbeat reverts whenever an update is a little late). 172800 = 2x heartbeat tolerates one fully missed update. Base ETH/USD: heartbeat UNVERIFIED (not in the Chainlink directory); observed max gap 1232s over 300 rounds, far inside the threshold, but if Chainlink's real heartbeat were longer than 48h valuation would revert (fails closed). Trade-off: too LOW reverts valid rates and freezes the vault; too HIGH accepts stale prices (up to 48h for ETH/USD because the threshold is global). Values re-checked 2026-10-01.",
+    "vaultPositionsLimit": 20,
+    "gasRelay": {
+      "verified": "repo config leaves hub/forwarder as address(0) TODO on Base; gas relay disabled",
+      "depositCooldown": 86400,
+      "depositMaxTotal": "1000000000000000000",
+      "feeMaxPercent": 10,
+      "relayFeeMaxBase": 0
+    }
+  },
+  "chainlink": {
+    "ethUsdAggregator": {
+      "address": "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70",
+      "verified": "rpc: description 'ETH / USD', 8 dec, fresh answer. Heartbeat NOT confirmed in Chainlink directory (observed max gap 1232s over 15 rounds)",
+      "heartbeatSeconds": null,
+      "heartbeatVerified": false,
+      "observedMaxGapSeconds": 1232,
+      "observation": "UNVERIFIED heartbeat: this proxy is not in the Chainlink directory JSON for Base. 300 rounds (~46h) read on-chain: median gap 390s, max 1232s."
+    },
+    "primitives": [
+      {
+        "symbol": "USDC",
+        "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "aggregator": "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B",
+        "rateAsset": "USD",
+        "heartbeatSeconds": 86400,
+        "verified": "rpc: description 'USDC / USD'; heartbeat 86400s per Chainlink directory (observed max round gap 86428s)",
+        "observedMaxGapSeconds": 86490,
+        "observation": "40 rounds (~956h): median gap 86418s, max 86490s (heartbeat 86400s, deviation 0.3% per Chainlink reference-data-directory JSON)"
+      }
+    ],
+    "sequencerUptimeFeed": {
+      "address": "0xBCF85224fc0756B9Fa45aA7892530B47e10b6433",
+      "verified": "rpc: code present; Chainlink docs https://docs.chain.link/data-feeds/l2-sequencer-feeds. Not read by Enzyme contracts; for the app/monitoring only"
+    }
+  },
+  "routers": {
+    "uniswapV3SwapRouter02": {
+      "address": "0x2626664c2603336E57B271c5C0b26F421741e481",
+      "verified": "rpc: code present, factory() and WETH9() read, selector b858183f present and c04b8d59 absent"
+    },
+    "uniswapV3Factory": {
+      "address": "0x33128a8fC17869897dcE68Ed026d694621f6FDfD",
+      "verified": "rpc: returned by router.factory()"
+    },
+    "paraSwapAugustusV6": {
+      "address": "0x6a000f20005980200259b80c5102003040001068",
+      "verified": "rpc: 24562 bytes of code; address per Velora docs"
+    },
+    "oneInchV5": {
+      "address": "0x1111111254EEB25477B68fb85Ed929f73A960582",
+      "verified": "rpc: code present (22484 bytes)"
+    }
+  },
+  "features": {
+    "vaultCreation": true,
+    "depositRedeem": true,
+    "swaps": true,
+    "uniswapV3Adapter": false,
+    "paraSwapV6Adapter": true,
+    "oneInchV5Adapter": true,
+    "zeroExV4Adapter": false,
+    "externalPositions": true,
+    "gasRelay": false,
+    "protocolFeeBuyback": true
+  },
+  "todo": [
+    "The existing UniswapV3Adapter calls the original SwapRouter exactInput (with deadline) and is NOT changed; Base only has SwapRouter02. PR #4 adds a separate UniswapV3SwapRouter02Adapter variant (no deadline protection). Uniswap v3 swaps stay disabled (uniswapV3Adapter=false) until that variant is deployed and registered by the follow-up adapter script.",
+    "GSN relay hub / trusted forwarder: unknown, gas relay disabled.",
+    "MLN/ETH Chainlink feed: none; protocol-fee buyback not usable via a priced MLN."
+  ]
+}
