@@ -38,7 +38,9 @@ jobs:
       - name: Install Foundry (anvil, for the E2E mock wallet signing test)
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: stable
+          # Pinned to match ci.yaml (forge/anvil 1.8.4, what `stable` resolved to) so a new
+          # Foundry release cannot silently change the E2E signing test.
+          version: v1.8.4
       - run: npm test
       # The E2E mock wallet (test-only, signs with a public Anvil key) must never be buildable for production.
       - name: Guard rejects the mock wallet flag on a Vercel production build
