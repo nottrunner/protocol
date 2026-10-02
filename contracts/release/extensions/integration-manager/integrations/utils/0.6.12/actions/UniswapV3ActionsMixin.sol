@@ -47,16 +47,34 @@ abstract contract UniswapV3ActionsMixin is AssetHelpers {
             }
         }
 
+        __uniswapV3ExactInput({
+            _router: UNISWAP_V3_ROUTER,
+            _encodedPath: encodedPath,
+            _recipient: _recipient,
+            _amountIn: _outgoingAssetAmount,
+            _amountOutMinimum: _minIncomingAssetAmount
+        });
+    }
+
+    /// @dev Helper to call `exactInput()` on the router.
+    /// Defaults to the original SwapRouter ABI (with `deadline`), as deployed on Ethereum, Polygon and Arbitrum.
+    /// Can be overridden by a variant that targets a router with a different ABI (e.g., SwapRouter02).
+    function __uniswapV3ExactInput(
+        address _router,
+        bytes memory _encodedPath,
+        address _recipient,
+        uint256 _amountIn,
+        uint256 _amountOutMinimum
+    ) internal virtual {
         IUniswapV3SwapRouter.ExactInputParams memory input = IUniswapV3SwapRouter.ExactInputParams({
-            path: encodedPath,
+            path: _encodedPath,
             recipient: _recipient,
             deadline: block.timestamp + 1,
-            amountIn: _outgoingAssetAmount,
-            amountOutMinimum: _minIncomingAssetAmount
+            amountIn: _amountIn,
+            amountOutMinimum: _amountOutMinimum
         });
 
-        // Execute fill
-        IUniswapV3SwapRouter(UNISWAP_V3_ROUTER).exactInput(input);
+        IUniswapV3SwapRouter(_router).exactInput(input);
     }
 
     ///////////////////

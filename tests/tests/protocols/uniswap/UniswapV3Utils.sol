@@ -23,6 +23,10 @@ address constant ARBITRUM_FACTORY_ADDRESS = ETHEREUM_FACTORY_ADDRESS;
 address constant ARBITRUM_NON_FUNGIBLE_TOKEN_MANAGER = ETHEREUM_NON_FUNGIBLE_TOKEN_MANAGER;
 address constant ARBITRUM_SWAP_ROUTER = ETHEREUM_SWAP_ROUTER;
 
+// Base only has Uniswap's SwapRouter02 (no `deadline` in `exactInput()` params)
+address constant BASE_FACTORY_ADDRESS = 0x33128a8fC17869897dcE68Ed026d694621f6FDfD;
+address constant BASE_SWAP_ROUTER_02 = 0x2626664c2603336E57B271c5C0b26F421741e481;
+
 abstract contract UniswapV3Utils is AddOnUtilsBase {
     using Address for address;
 

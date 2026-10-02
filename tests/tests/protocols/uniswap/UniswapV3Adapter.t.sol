@@ -11,7 +11,12 @@ import {IComptrollerLib} from "tests/interfaces/internal/IComptrollerLib.sol";
 import {IUniswapV3Adapter} from "tests/interfaces/internal/IUniswapV3Adapter.sol";
 import {IVaultLib} from "tests/interfaces/internal/IVaultLib.sol";
 
-import {ETHEREUM_SWAP_ROUTER, POLYGON_SWAP_ROUTER, ARBITRUM_SWAP_ROUTER} from "./UniswapV3Utils.sol";
+import {
+    ETHEREUM_SWAP_ROUTER,
+    POLYGON_SWAP_ROUTER,
+    ARBITRUM_SWAP_ROUTER,
+    BASE_SWAP_ROUTER_02
+} from "./UniswapV3Utils.sol";
 
 abstract contract TestBase is IntegrationTest {
     address internal fundOwner;
@@ -21,9 +26,13 @@ abstract contract TestBase is IntegrationTest {
     IUniswapV3Adapter internal adapter;
 
     function __initialize(uint256 _chainId, address _routerAddress) internal {
+        __initialize({_chainId: _chainId, _routerAddress: _routerAddress, _adapterArtifact: "UniswapV3Adapter.sol"});
+    }
+
+    function __initialize(uint256 _chainId, address _routerAddress, string memory _adapterArtifact) internal {
         setUpNetworkEnvironment({_chainId: _chainId});
 
-        adapter = __deployAdapter(_routerAddress);
+        adapter = __deployAdapter(_routerAddress, _adapterArtifact);
 
         IComptrollerLib comptrollerProxy;
         IVaultLib vaultProxy;
@@ -34,9 +43,12 @@ abstract contract TestBase is IntegrationTest {
 
     // DEPLOYMENT HELPERS
 
-    function __deployAdapter(address _routerAddress) private returns (IUniswapV3Adapter) {
+    function __deployAdapter(address _routerAddress, string memory _adapterArtifact)
+        private
+        returns (IUniswapV3Adapter)
+    {
         bytes memory args = abi.encode(address(core.release.integrationManager), _routerAddress);
-        address addr = deployCode("UniswapV3Adapter.sol", args);
+        address addr = deployCode(_adapterArtifact, args);
         return IUniswapV3Adapter(addr);
     }
 
@@ -209,6 +221,28 @@ contract UniswapV3AdapterArbitrumTest is TestBase {
             _pathAddresses: toArray(ARBITRUM_DAI, ARBITRUM_USDT, ARBITRUM_WETH),
             _pathFees: pathFees,
             _outgoingAssetAmount: 13 * assetUnit(IERC20(ARBITRUM_WETH))
+        });
+    }
+}
+
+// Base only has SwapRouter02 (no `deadline`), so it requires the UniswapV3SwapRouter02Adapter variant
+contract UniswapV3SwapRouter02AdapterBaseTest is TestBase {
+    function setUp() public override {
+        __initialize({
+            _chainId: BASE_CHAIN_ID,
+            _routerAddress: BASE_SWAP_ROUTER_02,
+            _adapterArtifact: "UniswapV3SwapRouter02Adapter.sol"
+        });
+    }
+
+    function test_takeOrder_success() public {
+        uint24[] memory pathFees = new uint24[](1);
+        pathFees[0] = 500;
+
+        __test_takeOrder_success({
+            _pathAddresses: toArray(BASE_WETH, BASE_USDC),
+            _pathFees: pathFees,
+            _outgoingAssetAmount: 4 * assetUnit(IERC20(BASE_WETH))
         });
     }
 }
