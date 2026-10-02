@@ -53,6 +53,17 @@ interface VmContext {
     function isContext(uint8 context) external view returns (bool);
 }
 
+interface IAddressListRegistryDeploy {
+    function createList(address _owner, uint8 _updateType, address[] calldata _initialItems)
+        external
+        returns (uint256 id_);
+    function isInList(uint256 _id, address _item) external view returns (bool);
+}
+
+interface IAdapterDeploy {
+    function getIntegrationManager() external view returns (address);
+}
+
 /// @dev `vm.rpc` is not in the pinned forge-std Vm interface; used only to detect an Anvil node (`anvil_nodeInfo`).
 interface VmRpc {
     function rpc(string calldata method, string calldata params) external returns (bytes memory);
@@ -89,6 +100,10 @@ contract DeployCore is Script {
         address[] primitives;
         address[] aggregators;
         uint8[] rateAssets;
+        // Adapter targets (address(0) = adapter not deployed on this chain)
+        address uniswapV3Router; // UniswapV3Adapter: original SwapRouter (exactInput has `deadline`)
+        address uniswapV3SwapRouter02; // UniswapV3SwapRouter02Adapter: SwapRouter02 (no `deadline`)
+        address paraSwapAugustusV6; // ParaSwapV6Adapter
     }
 
     struct Persistent {
@@ -115,15 +130,38 @@ contract DeployCore is Script {
         address fundValueCalculator;
     }
 
+    /// @dev Integration adapters. Enzyme's IntegrationManager has no adapter registry: any contract constructed with the
+    /// IntegrationManager address can be called through it (`onlyIntegrationManager` on the adapter side), and funds
+    /// restrict adapters per fund via the AllowedAdapters policies. So "registering" an adapter here means (1) binding it
+    /// to this deployment's IntegrationManager at construction and (2) listing it in an immutable AddressListRegistry list
+    /// (`approvedAdaptersListId`, owner = Dispatcher, UpdateType.None) that funds can use with AllowedAdaptersPolicy.
+    struct Adapters {
+        address uniswapV3Adapter;
+        address uniswapV3SwapRouter02Adapter;
+        address paraSwapV6Adapter;
+        uint256 approvedAdaptersListId;
+        bool listCreated;
+    }
+
     function run() external returns (Persistent memory p_, Release memory r_) {
-        Cfg memory c = loadConfig(vm.envString("CHAIN"));
+        Adapters memory a_;
         // Fail BEFORE any transaction is simulated or sent if RUN_KIND / --broadcast / node type are inconsistent
-        preflight(c.chain);
+        preflight(vm.envString("CHAIN"));
+        (p_, r_, a_) = deployAll(vm.envString("CHAIN"));
+    }
+
+    /// @dev Whole flow, also callable from tests (`new DeployCore().deployAll("base")`).
+    function deployAll(string memory _chain)
+        public
+        returns (Persistent memory p_, Release memory r_, Adapters memory a_)
+    {
+        Cfg memory c = loadConfig(_chain);
 
         vm.startBroadcast();
         p_ = deployPersistent();
         r_ = deployRelease(c, p_);
         postDeploy(c, p_, r_);
+        a_ = deployAdapters(c, p_, r_);
         address nextOwner = vm.envOr("DISPATCHER_OWNER", address(0));
         if (nextOwner != address(0)) {
             IOwned(p_.dispatcher).setNominatedOwner(nextOwner);
@@ -131,8 +169,9 @@ contract DeployCore is Script {
         vm.stopBroadcast();
 
         sanityCheck(c, p_, r_);
-        logAddresses(c, p_, r_);
-        writeDeployment(c, p_, r_);
+        sanityCheckAdapters(c, p_, r_, a_);
+        logAddresses(c, p_, r_, a_);
+        writeDeployment(c, p_, r_, a_);
     }
 
     // DEPLOYMENT RECORDS
@@ -207,7 +246,7 @@ contract DeployCore is Script {
         return false;
     }
 
-    function writeDeployment(Cfg memory _c, Persistent memory _p, Release memory _r) internal {
+    function writeDeployment(Cfg memory _c, Persistent memory _p, Release memory _r, Adapters memory _a) internal {
         string memory runKind = _runKind();
         bool broadcasting = _isBroadcasting();
         RecordAction action = decideRecordAction(runKind, _isAnvil(), broadcasting);
@@ -227,7 +266,7 @@ contract DeployCore is Script {
         }
         string memory path = string.concat("deployments/", _c.chain, pending ? ".pending.json" : ".json");
 
-        string memory addrJson = _addressesJson(_p, _r);
+        string memory addrJson = _addressesJson(_p, _r, _a);
         string memory denomJson = _denominationJson(_c);
 
         string memory o = "deployment";
@@ -279,12 +318,18 @@ contract DeployCore is Script {
         vm.serializeString(o, "scriptTreeDirty", vm.envOr("GIT_DIRTY", string("unknown")));
         vm.serializeString(o, "configSha256", vm.envOr("CONFIG_SHA256", string("unknown")));
         vm.serializeString(o, "denominationAsset", denomJson);
+        if (_a.listCreated) {
+            vm.serializeUint(o, "approvedAdaptersListId", _a.approvedAdaptersListId);
+        }
         string memory out = vm.serializeString(o, "addresses", addrJson);
         _writeRecord(path, out);
         console2.log("wrote", path);
     }
 
-    function _addressesJson(Persistent memory _p, Release memory _r) internal returns (string memory) {
+    function _addressesJson(Persistent memory _p, Release memory _r, Adapters memory _a)
+        internal
+        returns (string memory)
+    {
         string memory a = "addresses";
         vm.serializeAddress(a, "dispatcher", _p.dispatcher);
         vm.serializeAddress(a, "addressListRegistry", _p.addressListRegistry);
@@ -303,7 +348,17 @@ contract DeployCore is Script {
         vm.serializeAddress(a, "integrationManager", _r.integrationManager);
         vm.serializeAddress(a, "comptrollerLib", _r.comptrollerLib);
         vm.serializeAddress(a, "vaultLib", _r.vaultLib);
-        return vm.serializeAddress(a, "fundValueCalculator", _r.fundValueCalculator);
+        string memory out = vm.serializeAddress(a, "fundValueCalculator", _r.fundValueCalculator);
+        if (_a.uniswapV3Adapter != address(0)) {
+            out = vm.serializeAddress(a, "uniswapV3Adapter", _a.uniswapV3Adapter);
+        }
+        if (_a.uniswapV3SwapRouter02Adapter != address(0)) {
+            out = vm.serializeAddress(a, "uniswapV3SwapRouter02Adapter", _a.uniswapV3SwapRouter02Adapter);
+        }
+        if (_a.paraSwapV6Adapter != address(0)) {
+            out = vm.serializeAddress(a, "paraSwapV6Adapter", _a.paraSwapV6Adapter);
+        }
+        return out;
     }
 
     function _denominationJson(Cfg memory _c) internal returns (string memory) {
@@ -398,6 +453,17 @@ contract DeployCore is Script {
             c_.gasRelayForwarder = vm.parseJsonAddress(json, ".release.gasRelay.trustedForwarder");
         }
 
+        // Adapters (swaps only): the feature flag AND the router address must be present; Robinhood stays Phase 1 (none)
+        if (featureOn(json, "uniswapV3Adapter")) {
+            c_.uniswapV3Router = vm.parseJsonAddress(json, ".routers.uniswapV3SwapRouter.address");
+        }
+        if (featureOn(json, "uniswapV3SwapRouter02Adapter")) {
+            c_.uniswapV3SwapRouter02 = vm.parseJsonAddress(json, ".routers.uniswapV3SwapRouter02.address");
+        }
+        if (featureOn(json, "paraSwapV6Adapter")) {
+            c_.paraSwapAugustusV6 = vm.parseJsonAddress(json, ".routers.paraSwapAugustusV6.address");
+        }
+
         // Indexed reads (wildcard array parsing is unreliable for single-element arrays)
         uint256 n;
         while (VmKeyExists(address(vm)).keyExistsJson(json, string.concat(".chainlink.primitives[", vm.toString(n), "]"))) {
@@ -419,6 +485,12 @@ contract DeployCore is Script {
                 revert("DeployCore: unknown rateAsset");
             }
         }
+    }
+
+    /// @dev `features.<name>`; a missing key counts as false
+    function featureOn(string memory _json, string memory _name) internal returns (bool) {
+        string memory k = string.concat(".features.", _name);
+        return VmKeyExists(address(vm)).keyExistsJson(_json, k) && vm.parseJsonBool(_json, k);
     }
 
     // PERSISTENT (order mirrors DeploymentUtils.deployPersistentCore)
@@ -567,7 +639,7 @@ contract DeployCore is Script {
         }
     }
 
-    function logAddresses(Cfg memory _c, Persistent memory _p, Release memory _r) internal view {
+    function logAddresses(Cfg memory _c, Persistent memory _p, Release memory _r, Adapters memory _a) internal view {
         console2.log("== DeployCore:", _c.chain, "chainid", block.chainid);
         console2.log("dispatcher", _p.dispatcher);
         console2.log("addressListRegistry", _p.addressListRegistry);
@@ -587,5 +659,65 @@ contract DeployCore is Script {
         console2.log("comptrollerLib", _r.comptrollerLib);
         console2.log("vaultLib", _r.vaultLib);
         console2.log("fundValueCalculator", _r.fundValueCalculator);
+        console2.log("uniswapV3Adapter", _a.uniswapV3Adapter);
+        console2.log("uniswapV3SwapRouter02Adapter", _a.uniswapV3SwapRouter02Adapter);
+        console2.log("paraSwapV6Adapter", _a.paraSwapV6Adapter);
+        if (_a.listCreated) {
+            console2.log("approvedAdaptersListId", _a.approvedAdaptersListId);
+        }
+    }
+
+    // ADAPTERS
+
+    function deployAdapters(Cfg memory _c, Persistent memory _p, Release memory _r) internal returns (Adapters memory a_) {
+        uint256 n;
+        address[] memory items = new address[](3);
+
+        if (_c.uniswapV3Router != address(0)) {
+            a_.uniswapV3Adapter = deployCode("UniswapV3Adapter.sol", abi.encode(_r.integrationManager, _c.uniswapV3Router));
+            items[n++] = a_.uniswapV3Adapter;
+        }
+        if (_c.uniswapV3SwapRouter02 != address(0)) {
+            a_.uniswapV3SwapRouter02Adapter =
+                deployCode("UniswapV3SwapRouter02Adapter.sol", abi.encode(_r.integrationManager, _c.uniswapV3SwapRouter02));
+            items[n++] = a_.uniswapV3SwapRouter02Adapter;
+        }
+        if (_c.paraSwapAugustusV6 != address(0)) {
+            a_.paraSwapV6Adapter =
+                deployCode("ParaSwapV6Adapter.sol", abi.encode(_r.integrationManager, _c.paraSwapAugustusV6));
+            items[n++] = a_.paraSwapV6Adapter;
+        }
+
+        if (n > 0) {
+            address[] memory deployed = new address[](n);
+            for (uint256 i; i < n; i++) {
+                deployed[i] = items[i];
+            }
+            // UpdateType.None (0): the list is immutable; owner = Dispatcher (not the deployer)
+            a_.approvedAdaptersListId =
+                IAddressListRegistryDeploy(_p.addressListRegistry).createList(_p.dispatcher, 0, deployed);
+            a_.listCreated = true;
+        }
+    }
+
+    function sanityCheckAdapters(Cfg memory _c, Persistent memory _p, Release memory _r, Adapters memory _a)
+        internal
+        view
+    {
+        address[3] memory adapters = [_a.uniswapV3Adapter, _a.uniswapV3SwapRouter02Adapter, _a.paraSwapV6Adapter];
+        address[3] memory targets = [_c.uniswapV3Router, _c.uniswapV3SwapRouter02, _c.paraSwapAugustusV6];
+        for (uint256 i; i < 3; i++) {
+            require((adapters[i] != address(0)) == (targets[i] != address(0)), "DeployCore: adapter/target mismatch");
+            if (adapters[i] == address(0)) continue;
+            require(targets[i].code.length > 0, "DeployCore: adapter target has no code");
+            require(
+                IAdapterDeploy(adapters[i]).getIntegrationManager() == _r.integrationManager,
+                "DeployCore: adapter not bound to IntegrationManager"
+            );
+            require(
+                IAddressListRegistryDeploy(_p.addressListRegistry).isInList(_a.approvedAdaptersListId, adapters[i]),
+                "DeployCore: adapter not in approved list"
+            );
+        }
     }
 }

@@ -86,6 +86,7 @@
     "depositRedeem": true,
     "swaps": true,
     "uniswapV3Adapter": true,
+    "uniswapV3SwapRouter02Adapter": false,
     "paraSwapV6Adapter": true,
     "oneInchV5Adapter": true,
     "zeroExV4Adapter": false,

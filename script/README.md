@@ -23,8 +23,17 @@ Then: GlobalConfigLib upgrade, position deployer, FundDeployer pseudo-constants,
 config primitives (`chainlink.primitives`), `setReleaseLive`, `Dispatcher.setCurrentFundDeployer`.
 A final in-script check prices 1 WETH in the first registered primitive (proves feeds are fresh under the configured stale threshold).
 
-**Not deployed by this PR:** adapters (UniswapV3, ParaSwapV6, OneInchV5, ...), policies, fees, external position libs. Router addresses and
-feature flags in the config are for the follow-up adapter script. The existing `UniswapV3Adapter` is intentionally NOT changed here; PR #4 adds a separate `UniswapV3SwapRouter02Adapter` variant (no deadline protection) for chains that only have SwapRouter02.
+**Adapters (swaps, AC-4):** `deployAll` also deploys the integration adapters selected by `features.*` in the chain config and binds them to the
+IntegrationManager it just deployed:
+- `ParaSwapV6Adapter` (Augustus V6 from `routers.paraSwapAugustusV6`) on Ethereum, Base, Arbitrum,
+- `UniswapV3Adapter` (original SwapRouter, `exactInput` has `deadline`) on Ethereum and Arbitrum,
+- `UniswapV3SwapRouter02Adapter` (SwapRouter02, no `deadline`; PR #4, merged) on Base,
+- none on Robinhood (Phase 1: vault creation + deposit/redeem only).
+This Enzyme version has **no adapter registry in the IntegrationManager**: any contract constructed with the IntegrationManager address can be
+called through it, and each fund restricts adapters with the AllowedAdapters policies. "Registered" therefore means: bound to the
+IntegrationManager at construction (checked by the script) and listed in an **immutable AddressListRegistry list** (`UpdateType.None`, owner
+= Dispatcher) whose id is recorded as `approvedAdaptersListId`; funds can use that list id with `AllowedAdaptersPolicy`.
+`oneInchV5` / `zeroExV4` adapters, policies, fees and external position libs are still not deployed. The existing `UniswapV3Adapter` is intentionally NOT changed.
 
 ## Config
 
@@ -111,7 +120,7 @@ as `"testnet or unknown network"` with `mainnet: false`.
 
 Fields: `kind`, `mainnet`, `simulated`, `label`, `runKind`, `chain`, `chainId`, `forkBlock` (0 for a broadcast), `blockNumberAtDeploy`, `evmBlockNumberAtDeploy`, `blockNumberNote`, `blockTimestampAtDeploy`,
 `deployer`, `chainlinkStaleRateThresholdSeconds`, `denominationAsset` (`symbol`, `address`), `scriptCommit` (git SHA of the script at run time),
-`scriptTreeDirty`, `configSha256`, `addresses`; fork records also carry `log` (path + SHA-256 of `deployments/logs/<chain>.fork-run.txt`)
+`scriptTreeDirty`, `configSha256`, `addresses` (incl. `uniswapV3Adapter` / `uniswapV3SwapRouter02Adapter` / `paraSwapV6Adapter` where deployed), `approvedAdaptersListId`; fork records also carry `log` (path + SHA-256 of `deployments/logs/<chain>.fork-run.txt`)
 and `reproduce`; pending records add `pendingBroadcast`; finalized records add `confirmation`. `simulated` is additive (older records
 without it were plain simulations); no existing field changed. The addresses of a fork record exist only on a throwaway local fork; nothing
 was broadcast. No keys are involved (Anvil account #0 *address* only; `forge script` runs without `--broadcast`).
@@ -123,6 +132,8 @@ The finalizer has not been run against a real network.
 
 Block numbers: `forkBlock` and `blockNumberAtDeploy` are **chain-native** (`eth_blockNumber`), i.e. L2 blocks on Arbitrum and Robinhood.
 `evmBlockNumberAtDeploy` is `block.number` as seen inside the EVM, which is the *L1* block number on those two chains (Arbitrum semantics).
+
+`BROADCAST_LOCAL=1 script/fork-dry-run.sh <chain> [forkBlock]` runs the same fork kind with `--unlocked --broadcast` against the wrapper's own throwaway Anvil, so the committed record has `"simulated": false` (Anvil #0 is an unlocked test account; no key). The Anvil is stopped when the wrapper exits, and the wrapper refuses to start if its port is already in use.
 
 To keep a QA deployment alive on a local fork (so fixtures/apps can use it) run the script against the running Anvil with the fork kind and
 Anvil's unlocked account: `RUN_KIND=fork ... forge script ... --rpc-url http://127.0.0.1:<port> --sender 0xf39F... --unlocked --broadcast`.

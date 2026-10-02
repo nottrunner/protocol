@@ -6,7 +6,7 @@ p_: struct DeployCore.Persistent Persistent({ dispatcher: 0x19CC4DD8D86FC525f8CF
 r_: struct DeployCore.Release Release({ gasRelayPaymasterFactory: 0xAa07486C20F73fF4309495411927E6AE7C884DBa, fundDeployer: 0x81AE7583f06C2Bc141b9141FB9D701F0F2f59133, protocolFeeTracker: 0xAA2a95A342b774512c64799597bD75389e7d3C7a, valueInterpreter: 0xEd00171E28B55C3ba9bE26a474611755C860E6F0, policyManager: 0x6fc6A5b592406D9ee1e9a4e6BA20E03e73165B3A, externalPositionManager: 0xBd422978E222C626b94e66f33791a61FbE662115, feeManager: 0x67b444dB2581920A7Bb4FB07f6B19D614B7f6ACA, integrationManager: 0x3A41dfF0bB941fC5A1392c4f06cD1113b06c3eE2, comptrollerLib: 0x4ef58923c7e99598DAEB00CCE5315cAD9Efa3761, vaultLib: 0xd831912d86BE956A131cfe14E90C86c717407489, fundValueCalculator: 0xaEDA30eC4368181EFa71Ea32fb57c673Ab930f8f })
 
 == Logs ==
-  1 WETH in first primitive (raw units): 2752131432
+  1 WETH in first primitive (raw units): 2752153270
   == DeployCore: robinhood chainid 4663
   dispatcher 0x19CC4DD8D86FC525f8CF37c51612DE91b1E52038
   addressListRegistry 0x90e49f941bd68341A363225F5A2386D34a7FFd92
@@ -26,6 +26,9 @@ r_: struct DeployCore.Release Release({ gasRelayPaymasterFactory: 0xAa07486C20F7
   comptrollerLib 0x4ef58923c7e99598DAEB00CCE5315cAD9Efa3761
   vaultLib 0xd831912d86BE956A131cfe14E90C86c717407489
   fundValueCalculator 0xaEDA30eC4368181EFa71Ea32fb57c673Ab930f8f
+  uniswapV3Adapter 0x0000000000000000000000000000000000000000
+  uniswapV3SwapRouter02Adapter 0x0000000000000000000000000000000000000000
+  paraSwapV6Adapter 0x0000000000000000000000000000000000000000
   wrote deployments/robinhood.json
 
 ## Setting up 1 EVM.
@@ -34,17 +37,20 @@ r_: struct DeployCore.Release Release({ gasRelayPaymasterFactory: 0xAa07486C20F7
 
 Chain 4663
 
-Estimated max fee per gas: 0.055891503 gwei
-Estimated base fee per gas: 0.027945751 gwei
+Estimated max fee per gas: 0.055737503 gwei
+Estimated base fee per gas: 0.027868751 gwei
 Estimated max priority fee per gas: 0.000000001 gwei
 
 Estimated total gas used for script: 48100104
 
-Estimated amount required: 0.002688387107016312 ETH
+Estimated amount required: 0.002680979691000312 ETH
 
 ==========================
 
-SIMULATION COMPLETE. To broadcast these transactions, add --broadcast and wallet configuration(s) to the previous command. See forge script --help for more.
+
+==========================
+
+ONCHAIN EXECUTION COMPLETE & SUCCESSFUL.
 
 
 

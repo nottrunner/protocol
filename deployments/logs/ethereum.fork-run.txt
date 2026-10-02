@@ -26,6 +26,10 @@ r_: struct DeployCore.Release Release({ gasRelayPaymasterFactory: 0x3A06016bcbeC
   comptrollerLib 0xf36b4DF0aE53eF1617bdcb2cE62a20648b738Aae
   vaultLib 0x9D34cDcC5BE86511FEc4A1771fa3ec581dC63603
   fundValueCalculator 0x0B638579bC7F7370AD454A12c6B53116518A0970
+  uniswapV3Adapter 0x3739d0418dB3e3DFD153C75D33B5654f576C5600
+  uniswapV3SwapRouter02Adapter 0x0000000000000000000000000000000000000000
+  paraSwapV6Adapter 0x0B899FdDF0C1e184037c856378995169C5804905
+  approvedAdaptersListId 1
   wrote deployments/ethereum.json
 
 ## Setting up 1 EVM.
@@ -34,17 +38,20 @@ r_: struct DeployCore.Release Release({ gasRelayPaymasterFactory: 0x3A06016bcbeC
 
 Chain 1
 
-Estimated max fee per gas: 0.197602632 gwei
-Estimated base fee per gas: 0.098563816 gwei
-Estimated max priority fee per gas: 0.000475 gwei
+Estimated max fee per gas: 0.204907879 gwei
+Estimated base fee per gas: 0.100633183 gwei
+Estimated max priority fee per gas: 0.003641513 gwei
 
-Estimated total gas used for script: 48555145
+Estimated total gas used for script: 51804941
 
-Estimated amount required: 0.00959462444914164 ETH
+Estimated amount required: 0.010615240582030139 ETH
 
 ==========================
 
-SIMULATION COMPLETE. To broadcast these transactions, add --broadcast and wallet configuration(s) to the previous command. See forge script --help for more.
+
+==========================
+
+ONCHAIN EXECUTION COMPLETE & SUCCESSFUL.
 
 
 

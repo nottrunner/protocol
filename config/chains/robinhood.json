@@ -74,6 +74,7 @@
     "depositRedeem": true,
     "swaps": false,
     "uniswapV3Adapter": false,
+    "uniswapV3SwapRouter02Adapter": false,
     "paraSwapV6Adapter": false,
     "oneInchV5Adapter": false,
     "zeroExV4Adapter": false,
@@ -81,7 +82,7 @@
     "gasRelay": false,
     "protocolFeeBuyback": false,
     "phase": 1,
-    "phaseNote": "Phase 1 = vault creation + deposit/redeem only, USDG denomination. Phase 2 = ParaSwap v6 behind AllowedAdapters. Phase 3 = the new UniswapV3SwapRouter02Adapter variant from PR #4 (the existing UniswapV3Adapter is not patched)."
+    "phaseNote": "Phase 1 = vault creation + deposit/redeem only, USDG denomination. Phase 2 = ParaSwap v6 behind AllowedAdapters. Phase 3 = UniswapV3SwapRouter02Adapter (merged in PR #4; Robinhood only has SwapRouter02). The existing UniswapV3Adapter is not patched."
   },
   "excludedTokens": [
     {

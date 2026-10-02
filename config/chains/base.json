@@ -83,6 +83,7 @@
     "depositRedeem": true,
     "swaps": true,
     "uniswapV3Adapter": false,
+    "uniswapV3SwapRouter02Adapter": true,
     "paraSwapV6Adapter": true,
     "oneInchV5Adapter": true,
     "zeroExV4Adapter": false,
@@ -91,7 +92,7 @@
     "protocolFeeBuyback": true
   },
   "todo": [
-    "The existing UniswapV3Adapter calls the original SwapRouter exactInput (with deadline) and is NOT changed; Base only has SwapRouter02. PR #4 adds a separate UniswapV3SwapRouter02Adapter variant (no deadline protection). Uniswap v3 swaps stay disabled (uniswapV3Adapter=false) until that variant is deployed and registered by the follow-up adapter script.",
+    "The existing UniswapV3Adapter calls the original SwapRouter exactInput (with deadline) and is NOT changed; Base only has SwapRouter02, so Base uses the separate UniswapV3SwapRouter02Adapter (no deadline protection, merged in PR #4) which DeployCore now deploys and lists in approvedAdaptersListId. uniswapV3Adapter stays false on Base.",
     "GSN relay hub / trusted forwarder: unknown, gas relay disabled.",
     "MLN/ETH Chainlink feed: none; protocol-fee buyback not usable via a priced MLN."
   ]
