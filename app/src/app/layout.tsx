@@ -7,7 +7,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Onchain Portfolio",
-  description: "Create and manage onchain portfolios across Ethereum, Base, Arbitrum and Robinhood Chain.",
+  description: "Create and manage onchain portfolios across Ethereum, Base, Arbitrum, Robinhood Chain and HyperEVM.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

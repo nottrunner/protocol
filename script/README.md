@@ -4,15 +4,15 @@
 reading `config/chains/<chain>.json`. It mirrors `tests/utils/core/deployment/DeploymentUtils.sol`
 (`deployPersistentCore` + `deployReleaseCore`) with real broadcasts instead of `vm.prank`.
 
-Chains: `ethereum` (1), `base` (8453), `arbitrum` (42161), `robinhood` (4663).
+Chains: `ethereum` (1), `base` (8453), `arbitrum` (42161), `robinhood` (4663), `hyperliquid` (999, HyperEVM).
 
 ## Open decision (needs the user)
 
-**Reuse Enzyme's live deployments vs. fresh fork deployment.** Default assumption in this PR: **fresh deploy on all four**.
+**Reuse Enzyme's live deployments vs. fresh fork deployment.** Default assumption in this PR: **fresh deploy on all five chains** (Ethereum, Base, Arbitrum, Robinhood Chain, HyperEVM).
 - Reuse (Ethereum/Arbitrum/Base only; Enzyme has nothing on Robinhood Chain): no audit/ops burden, but the
   ValueInterpreter feeds and adapter registry are owned by Enzyme DAO / Technical Committee, so we can't add assets or adapters.
 - Fresh: full control (we add feeds/adapters), but we own governance, audits and the Dispatcher owner key.
-Robinhood Chain needs a fresh deploy either way. If "reuse" is chosen for the other three, this script is only used for Robinhood.
+Robinhood Chain needs a fresh deploy either way. If "reuse" is chosen for the other three, this script is only used for Robinhood Chain and HyperEVM (Enzyme has no HyperEVM deployment either).
 
 ## What is deployed / configured
 
@@ -50,11 +50,11 @@ MLN token / burner are `address(0)` there (no MLN on that chain; buyback unusabl
 ```bash
 git submodule update --init --recursive
 forge build contracts                       # script uses deployCode() on artifacts in ./artifacts
-cp .env.example .env                        # fill in RPC URLs (ETHEREUM_NODE_MAINNET/_BASE/_ARBITRUM/_ROBINHOOD); never commit .env
+cp .env.example .env                        # fill in RPC URLs (ETHEREUM_NODE_MAINNET/_BASE/_ARBITRUM/_ROBINHOOD/_HYPERLIQUID); never commit .env
 source .env
 ```
 
-`foundry.toml` `fs_permissions` is narrow: read `./artifacts` and `./config`; read-write only for `./deployments/<chain>.json` and `./deployments/<chain>.pending.json` of the four chains (no wildcard, no `OUTPUT_PATH`; the output path is fixed). `CHAIN` selects the config.
+`foundry.toml` `fs_permissions` is narrow: read `./artifacts` and `./config`; read-write only for `./deployments/<chain>.json` and `./deployments/<chain>.pending.json` of the five chains (no wildcard, no `OUTPUT_PATH`; the output path is fixed). `CHAIN` selects the config.
 
 ### Dry run against a local anvil fork (no broadcast)
 
@@ -114,9 +114,9 @@ Preflight reverts (before `vm.startBroadcast`): `--broadcast` on a non-Anvil nod
 node; `RUN_KIND=broadcast` on Anvil; an unknown `RUN_KIND`; an existing `mainnet: true` record (also for a pending broadcast, unless
 `OVERWRITE_MAINNET_RECORD=true`). `script/fork-dry-run.sh` also refuses to overwrite a `mainnet: true` record. `OUTPUT_PATH` no longer exists.
 
-**Chain id allowlist:** `config/mainnet-chain-ids.json` (`mainnetChainIds`: 1, 8453, 42161, 4663) is the single source of truth for both the
-script and the finalizer. HyperEVM (chain id 999) is not listed yet (todo in that file); until it is added, a HyperEVM broadcast is finalized
-as `"testnet or unknown network"` with `mainnet: false`.
+**Chain id allowlist:** `config/mainnet-chain-ids.json` (`mainnetChainIds`: 1, 8453, 42161, 4663, 999) is the single source of truth for both the
+script and the finalizer. HyperEVM (chain id 999) is listed, so a confirmed HyperEVM broadcast is finalized as `"mainnet broadcast"` (any chain id not in the file is
+finalized as `"testnet or unknown network"` with `mainnet: false`).
 
 Fields: `kind`, `mainnet`, `simulated`, `label`, `runKind`, `chain`, `chainId`, `forkBlock` (0 for a broadcast), `blockNumberAtDeploy`, `evmBlockNumberAtDeploy`, `blockNumberNote`, `blockTimestampAtDeploy`,
 `deployer`, `chainlinkStaleRateThresholdSeconds`, `denominationAsset` (`symbol`, `address`), `scriptCommit` (git SHA of the script at run time),
@@ -142,7 +142,7 @@ Anvil's unlocked account: `RUN_KIND=fork ... forge script ... --rpc-url http://1
 Reproduce a fork record (needs `forge`/`anvil`, `python3`, `jq`, a clean checkout of `scriptCommit`):
 ```bash
 git checkout <scriptCommit> && git submodule update --init --recursive
-script/fork-dry-run.sh <ethereum|base|arbitrum|robinhood> <forkBlock>    # forkBlock from the record
+script/fork-dry-run.sh <ethereum|base|arbitrum|robinhood|hyperliquid> <forkBlock>    # forkBlock from the record
 diff <(jq -S .addresses deployments/<chain>.json) <(git show <commit>:deployments/<chain>.json | jq -S .addresses)
 ```
 The addresses are CREATE addresses of the sender (Anvil #0), so the same commit + same fork block + same sender gives the same addresses
@@ -162,7 +162,32 @@ revert (valuation, deposits, redeems freeze, fails closed). Too high: stale pric
 | Base | ETH/USD (**heartbeat UNVERIFIED**; 1232s), USDC/USD (86400s; 86490s) | 172800 s |
 | Arbitrum | ETH/USD (1755s; 630s), USDC/USD (255s; 330s) | 3600 s |
 | Robinhood | ETH/USD (86400s; 32560s), USDG/USD (86400s; 86430s) | 172800 s |
+| HyperEVM | HYPE/USD (86400s; 6213s), USDC/USD (86400s; 86484s) | 172800 s |
 
 ## Verified in this PR
-`forge build contracts` OK; dry run executed successfully against local anvil forks of all four chains (including the post-deploy pricing check).
-Nothing was broadcast.
+`forge build contracts` OK; the dry run executed successfully against local anvil forks of Ethereum, Base, Arbitrum and Robinhood Chain, and HyperEVM
+(local-fork broadcast with a 30M block gas limit; see the HyperEVM section), including the post-deploy pricing check. Nothing was broadcast to a real network.
+
+## HyperEVM (`CHAIN=hyperliquid`, chain id 999)
+
+Phase 1 only (vault creation + deposit/redeem; `swaps=false`, no adapters; swaps are Phase 2). Denomination asset is Circle-native USDC
+`0xb88339CB7199b77E23DB6E890353E22632Ba630f` (checked on-chain and against Circle's published list). The gas token is HYPE, so Wrapped HYPE
+(`0x5555...5555`) is the `weth` anchor and the HYPE/USD feed is the "ETH/USD" aggregator. Only 8-decimal feeds are registered.
+
+**Big blocks.** `ComptrollerLib` (~5.17M gas), `VaultLib` (~4.26M) and `FundDeployer` (~3.96M) exceed HyperEVM's 3M small-block gas limit; the core
+deployment needs 30M big blocks (the deployer address must enable `{"type":"evmUserModify","usingBigBlocks":true}` first). A local Anvil fork cannot
+enforce the small-block cap and inherits the fork block's 3M gas limit (the deploy then fails with `OutOfGas`), so `script/fork-dry-run.sh hyperliquid`
+starts Anvil with `--gas-limit 30000000`. The record gets the additive fields `bigBlocksEmulated` (fork records only; true iff the run's block gas limit was >= 30M),
+`blockGasLimit` and `bigBlocksNote`; they exist only for chains whose config has `deployment.bigBlocksRequired: true`. `bigBlocksEmulated: true`
+means big-block conditions were emulated by the gas limit, not enforced. Pending (real broadcast) records carry only `blockGasLimit` (the simulation's)
+and the note, never a boolean: a real broadcast needs big-block mode enabled for the deployer and the script cannot check it.
+(An earlier revision called the field `bigBlocks`; it was renamed because "true" overstated what a fork can prove. Nothing on `dev` read it.)
+
+```bash
+BROADCAST_LOCAL=1 script/fork-dry-run.sh hyperliquid [forkBlock]   # real broadcast to the wrapper's own throwaway Anvil (--unlocked, no key): simulated=false
+script/fork-dry-run.sh hyperliquid                                  # plain simulation: simulated=true
+```
+`BROADCAST_LOCAL=1` makes the fork kind run with `--unlocked --broadcast` against that Anvil (Anvil #0 is an unlocked test account); the record stays
+`"kind": "fork, not mainnet"`, `"mainnet": false`. The wrapper refuses to start if its port (8646) is already in use. Public RPC `https://rpc.hyperliquid.xyz/evm`
+is read-only and rate-limited; set `ETHEREUM_NODE_HYPERLIQUID` to use another endpoint.
+

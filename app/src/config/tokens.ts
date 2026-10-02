@@ -3,8 +3,8 @@ import type { Address } from "viem";
 export type KnownToken = { symbol: string; address: Address; decimals: number; note?: string; denomination?: boolean };
 
 /**
- * Verified token addresses (config/chains/*.json on feat/deploy-scripts: on-chain symbol/decimals reads on 2026-10-01;
- * Robinhood per docs.robinhood.com/chain/contracts). `denomination: true` marks the asset the deploy script registers as
+ * Verified token addresses (config/chains/*.json: on-chain symbol/decimals reads on 2026-10-01 and, for HyperEVM, 2026-10-02;
+ * Robinhood per docs.robinhood.com/chain/contracts; HyperEVM per config/chains/hyperliquid.json). `denomination: true` marks the asset the deploy script registers as
  * the chain's denomination primitive. Users can paste other addresses where the form allows it.
  * Do NOT add the token labelled "USDC" at 0x378F…8030 on Robinhood Chain: it is 18 decimals and not Circle USDC.
  */
@@ -24,6 +24,12 @@ export const knownTokens: Record<number, KnownToken[]> = {
   4663: [
     { symbol: "USDG", address: "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168", decimals: 6, note: "Paxos USDG", denomination: true },
     { symbol: "WETH", address: "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73", decimals: 18, note: "aeWETH" },
+  ],
+  // HyperEVM: USDC is the denomination asset (Circle-native; on-chain read + Circle's published address list, see
+  // config/chains/hyperliquid.json). WHYPE is Wrapped HYPE (wrapped native), not Ethereum's WETH.
+  999: [
+    { symbol: "USDC", address: "0xb88339CB7199b77E23DB6E890353E22632Ba630f", decimals: 6, note: "Circle-native USDC", denomination: true },
+    { symbol: "WHYPE", address: "0x5555555555555555555555555555555555555555", decimals: 18, note: "Wrapped HYPE" },
   ],
 };
 

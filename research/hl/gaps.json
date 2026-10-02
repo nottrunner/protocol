@@ -1,0 +1,92 @@
+{
+ "ETH/USD 8d": {
+  "addr": "0x017151e74fB3a393673B5B5149F53578c0Fa55B0",
+  "desc": "ETH / USD",
+  "dec": 8,
+  "version": 6,
+  "roundId": 18446744073709562405,
+  "rounds": 61,
+  "maxgap": 31006,
+  "median": 2986.0,
+  "mingap": 150,
+  "span_h": 87.32416666666667,
+  "top3": [
+   18717,
+   24163,
+   31006
+  ],
+  "latest_answer": 2702.1829
+ },
+ "USDC/USD 8d": {
+  "addr": "0xA0Adc43ce7AfE3EE7d7eac3C994E178D0620223B",
+  "desc": "USDC / USD",
+  "dec": 8,
+  "version": 6,
+  "roundId": 36893488147419103275,
+  "rounds": 61,
+  "maxgap": 1787243427,
+  "median": 86416.0,
+  "mingap": 0,
+  "span_h": 497464.75666666665,
+  "top3": [
+   86483,
+   86484,
+   1787243427
+  ],
+  "latest_answer": 0.99996476
+ },
+ "USDT/USD 8d": {
+  "addr": "0x9114446540B4f8E0E310041981f7c1Be6181Ed07",
+  "desc": "USDT / USD",
+  "dec": 8,
+  "version": 6,
+  "roundId": 36893488147419103275,
+  "rounds": 61,
+  "maxgap": 1787243495,
+  "median": 86405.5,
+  "mingap": 0,
+  "span_h": 497464.73555555556,
+  "top3": [
+   86469,
+   86480,
+   1787243495
+  ],
+  "latest_answer": 0.99954474
+ },
+ "HYPE/USD 8d": {
+  "addr": "0xa5a72eF19F82A579431186402425593a559ed352",
+  "desc": "HYPE / USD",
+  "dec": 8,
+  "version": 6,
+  "roundId": 18446744073709577401,
+  "rounds": 61,
+  "maxgap": 6213,
+  "median": 1234.5,
+  "mingap": 180,
+  "span_h": 25.30666666666667,
+  "top3": [
+   4352,
+   4562,
+   6213
+  ],
+  "latest_answer": 87.45684
+ },
+ "BTC/USD 8d": {
+  "addr": "0x71A2017296De30F4597B36FBD90b7e8Ec6E97A82",
+  "desc": "BTC / USD",
+  "dec": 8,
+  "version": 6,
+  "roundId": 18446744073709557897,
+  "rounds": 61,
+  "maxgap": 86405,
+  "median": 3769.0,
+  "mingap": 177,
+  "span_h": 147.89944444444444,
+  "top3": [
+   35390,
+   36697,
+   86405
+  ],
+  "latest_answer": 84682.93456557
+ }
+}

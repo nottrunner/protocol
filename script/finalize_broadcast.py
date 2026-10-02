@@ -129,7 +129,7 @@ def finalize(chain, rpc_url, root=".", env=os.environ):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("chain", choices=["ethereum", "base", "arbitrum", "robinhood"])
+    ap.add_argument("chain", choices=["ethereum", "base", "arbitrum", "robinhood", "hyperliquid"])
     ap.add_argument("--rpc-url", default=os.environ.get("FINALIZE_RPC_URL"))
     ap.add_argument("--root", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
     a = ap.parse_args()

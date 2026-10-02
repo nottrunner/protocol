@@ -230,7 +230,7 @@ contract DeployCoreRecordsTest is Test {
         assertTrue(h.knownMainnet(8453));
         assertTrue(h.knownMainnet(42161));
         assertTrue(h.knownMainnet(4663));
-        assertFalse(h.knownMainnet(999), "HyperEVM is not added yet");
+        assertTrue(h.knownMainnet(999), "HyperEVM (chain id 999)");
         assertFalse(h.knownMainnet(11155111));
         assertFalse(h.knownMainnet(31337));
         assertFalse(h.knownMainnet(84532));

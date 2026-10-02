@@ -10,7 +10,7 @@ export function PortfolioRoute({ chainParam, vault }: { chainParam: string; vaul
     <>
       <h1>Portfolio</h1>
       {chainId === undefined
-        ? <Notice kind="error">Unknown network &quot;{chainParam}&quot;. Use ethereum, base, arbitrum or robinhood.</Notice>
+        ? <Notice kind="error">Unknown network &quot;{chainParam}&quot;. Use ethereum, base, arbitrum, robinhood or hyperevm.</Notice>
         : <PortfolioView chainId={chainId} vault={vault} />}
     </>
   );

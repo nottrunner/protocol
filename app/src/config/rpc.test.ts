@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { arbitrumChain, baseChain, ethereumChain, robinhoodChain } from "./chains";
+import { arbitrumChain, baseChain, ethereumChain, hyperEvmChain, robinhoodChain } from "./chains";
 import { DEFAULT_RPC_URLS, RPC_ENV_VARS, readRpcEnv, resolveRpcUrl, resolveRpcUrls } from "./rpc";
 
 const LOCAL = "http://127.0.0.1:8545";
@@ -10,6 +10,7 @@ describe("resolveRpcUrl", () => {
     expect(resolveRpcUrl("base", undefined)).toBe("https://mainnet.base.org");
     expect(resolveRpcUrl("robinhood", undefined)).toBe("https://rpc.mainnet.chain.robinhood.com");
     expect(resolveRpcUrl("arbitrum", undefined)).toBe("https://arb1.arbitrum.io/rpc");
+    expect(resolveRpcUrl("hyperevm", undefined)).toBe("https://rpc.hyperliquid.xyz/evm");
   });
   it("uses the env override when set", () => {
     expect(resolveRpcUrl("ethereum", LOCAL)).toBe(LOCAL);
@@ -39,8 +40,8 @@ describe("resolveRpcUrls", () => {
     expect(resolveRpcUrls({ ethereum: LOCAL, base: "" })).toEqual({ ...DEFAULT_RPC_URLS, ethereum: LOCAL });
   });
   it("can point every chain at one local fork", () => {
-    const all = resolveRpcUrls({ ethereum: LOCAL, base: LOCAL, robinhood: LOCAL, arbitrum: LOCAL });
-    expect(Object.values(all)).toEqual([LOCAL, LOCAL, LOCAL, LOCAL]);
+    const all = resolveRpcUrls({ ethereum: LOCAL, base: LOCAL, robinhood: LOCAL, arbitrum: LOCAL, hyperevm: LOCAL });
+    expect(Object.values(all)).toEqual([LOCAL, LOCAL, LOCAL, LOCAL, LOCAL]);
   });
 });
 
@@ -51,6 +52,7 @@ describe("env var names", () => {
       base: "NEXT_PUBLIC_RPC_URL_BASE",
       robinhood: "NEXT_PUBLIC_RPC_URL_ROBINHOOD",
       arbitrum: "NEXT_PUBLIC_RPC_URL_ARBITRUM",
+      hyperevm: "NEXT_PUBLIC_RPC_URL_HYPEREVM",
     });
   });
 });
@@ -63,6 +65,8 @@ describe("chain definitions", () => {
     expect(arbitrumChain.rpcUrls.default.http[0]).toBe(DEFAULT_RPC_URLS.arbitrum);
     expect(robinhoodChain.rpcUrls.default.http[0]).toBe(DEFAULT_RPC_URLS.robinhood);
     expect(robinhoodChain.id).toBe(4663);
+    expect(hyperEvmChain.rpcUrls.default.http[0]).toBe(DEFAULT_RPC_URLS.hyperevm);
+    expect(hyperEvmChain.id).toBe(999);
   });
 });
 
@@ -72,20 +76,23 @@ describe("process.env wiring", () => {
     vi.resetModules();
   });
 
-  it("readRpcEnv reads the four public vars", () => {
+  it("readRpcEnv reads the five public vars", () => {
     vi.stubEnv("NEXT_PUBLIC_RPC_URL_ETHEREUM", LOCAL);
     vi.stubEnv("NEXT_PUBLIC_RPC_URL_BASE", "");
-    expect(readRpcEnv()).toMatchObject({ ethereum: LOCAL, base: "" });
+    vi.stubEnv("NEXT_PUBLIC_RPC_URL_HYPEREVM", "http://127.0.0.1:8646");
+    expect(readRpcEnv()).toMatchObject({ ethereum: LOCAL, base: "", hyperevm: "http://127.0.0.1:8646" });
   });
 
   it("chain definitions pick up env overrides and ignore empty values", async () => {
     vi.stubEnv("NEXT_PUBLIC_RPC_URL_ETHEREUM", LOCAL);
     vi.stubEnv("NEXT_PUBLIC_RPC_URL_ROBINHOOD", "http://127.0.0.1:8546");
+    vi.stubEnv("NEXT_PUBLIC_RPC_URL_HYPEREVM", "http://127.0.0.1:8646");
     vi.stubEnv("NEXT_PUBLIC_RPC_URL_BASE", "");
     vi.resetModules();
     const chains = await import("./chains");
     expect(chains.ethereumChain.rpcUrls.default.http[0]).toBe(LOCAL);
     expect(chains.robinhoodChain.rpcUrls.default.http[0]).toBe("http://127.0.0.1:8546");
+    expect(chains.hyperEvmChain.rpcUrls.default.http[0]).toBe("http://127.0.0.1:8646");
     expect(chains.baseChain.rpcUrls.default.http[0]).toBe(DEFAULT_RPC_URLS.base);
     expect(chains.arbitrumChain.rpcUrls.default.http[0]).toBe(DEFAULT_RPC_URLS.arbitrum);
   });

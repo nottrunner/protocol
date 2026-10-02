@@ -1,0 +1,51 @@
+{
+  "addresses": {
+    "addressListRegistry": "0x0355B7B8cb128fA5692729Ab3AAa199C1753f726",
+    "comptrollerLib": "0x86A2EE8FAf9A840F7a2c64CA3d51209F9A02081D",
+    "dispatcher": "0x8198f5d8F8CfFE8f9C413d98a0A55aEB8ab9FbB7",
+    "externalPositionFactory": "0x202CCe504e04bEd6fC0521238dDf04Bc9E8E15aB",
+    "externalPositionManager": "0x7A9Ec1d04904907De0ED7b6839CcdD59c3716AC9",
+    "feeManager": "0x49fd2BE640DB2910c2fAb69bB8531Ab6E76127ff",
+    "fundDeployer": "0xC9a43158891282A2B1475592D5719c001986Aaec",
+    "fundValueCalculator": "0xf953b3A269d80e3eB0F2947630Da976B896A8C5b",
+    "fundValueCalculatorRouter": "0x2B0d36FACD61B71CC05ab8F3D2355ec3631C0dd5",
+    "gasRelayPaymasterFactory": "0x46b142DD1E924FAb83eCc3c08e4D46E82f005e0E",
+    "globalConfigProxy": "0x172076E0166D1F9Cc711C77Adf8488051744980C",
+    "integrationManager": "0x4631BCAbD6dF18D94796344963cB60d44a4136b6",
+    "policyManager": "0x4C2F7092C2aE51D986bEFEe378e50BD4dB99C901",
+    "protocolFeeReserveProxy": "0xBEc49fA140aCaA83533fB00A2BB19bDdd0290f25",
+    "protocolFeeTracker": "0x1c85638e118b37167e9298c2268758e058DdfDA0",
+    "uintListRegistry": "0xD84379CEae14AA33C123Af12424A37803F885889",
+    "valueInterpreter": "0x367761085BF3C12e5DA2Df99AC6E1a824612b8fb",
+    "vaultLib": "0xA4899D35897033b927acFCf422bc745916139776"
+  },
+  "bigBlocksEmulated": true,
+  "bigBlocksNote": "A local Anvil fork cannot enforce HyperEVM's 3M small-block gas cap; this run used the block gas limit shown (>= 30M means big-block conditions were emulated). ComptrollerLib/VaultLib/FundDeployer exceed 3M gas, so a real deployment needs the deployer to enable big blocks (L1 action evmUserModify usingBigBlocks=true).",
+  "blockGasLimit": 30000000,
+  "blockNumberAtDeploy": 47483593,
+  "blockNumberNote": "blockNumberAtDeploy and forkBlock are chain-native block numbers (eth_blockNumber; L2 blocks on arbitrum/robinhood). evmBlockNumberAtDeploy is block.number as seen inside the EVM (the L1 block number on arbitrum/robinhood).",
+  "blockTimestampAtDeploy": 1790961696,
+  "chain": "hyperliquid",
+  "chainId": 999,
+  "chainlinkStaleRateThresholdSeconds": 172800,
+  "configSha256": "1d0ff02ec260514c59b4540e51f549c7f84124500863886e514f8f719bac091b",
+  "denominationAsset": {
+    "address": "0xb88339CB7199b77E23DB6E890353E22632Ba630f",
+    "symbol": "USDC"
+  },
+  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "evmBlockNumberAtDeploy": 47483593,
+  "forkBlock": 47483592,
+  "kind": "fork, not mainnet",
+  "label": "ANVIL FORK RUN - NOT A MAINNET DEPLOYMENT. Addresses exist only on a throwaway local fork.",
+  "mainnet": false,
+  "runKind": "fork",
+  "scriptCommit": "47452de8f9fab6c856b48af9e400284f5ada2136",
+  "scriptTreeDirty": "false",
+  "simulated": false,
+  "log": {
+    "path": "deployments/logs/hyperliquid.fork-run.txt",
+    "sha256": "cc843ba85bec94306369633896144b177ebe48aa9f3bc9b9518b55868e90dd6f"
+  },
+  "reproduce": "BROADCAST_LOCAL=1 script/fork-dry-run.sh hyperliquid 47483592  (same commit + same fork block + same sender => same addresses)"
+}

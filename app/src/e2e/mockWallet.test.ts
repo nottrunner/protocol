@@ -24,12 +24,13 @@ const ANVIL = [join(homedir(), ".foundry/bin/anvil"), "anvil"].find(
   (c) => (c === "anvil" ? spawnSync("anvil", ["--version"]).status === 0 : existsSync(c)),
 );
 
-// Same four chain ids as the app (src/config/chains.ts); one local Anvil (no fork) per chain.
+// Same five chain ids as the app (src/config/chains.ts); one local Anvil (no fork) per chain.
 const LOCAL = [
   { id: 1, name: "Ethereum", port: 18601 },
   { id: 8453, name: "Base", port: 18602 },
   { id: 42161, name: "Arbitrum One", port: 18603 },
   { id: 4663, name: "Robinhood Chain", port: 18604 },
+  { id: 999, name: "HyperEVM", port: 18605 },
 ] as const;
 
 describe("rpcTxToRequest", () => {
@@ -75,7 +76,7 @@ describe.skipIf(!ANVIL)("E2E mock connector against local Anvil (no fork)", () =
     expect(connector.name).toBe("E2E Mock Wallet");
   });
 
-  it("connects, then switches across all four chains and sends a tx on each via that chain's transport", async () => {
+  it("connects, then switches across all five chains and sends a tx on each via that chain's transport", async () => {
     const res = await connect(config, { connector, chainId: 1 });
     expect(res.accounts).toEqual([account.address]);
     expect(res.chainId).toBe(1);

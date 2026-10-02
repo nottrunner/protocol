@@ -91,6 +91,7 @@ contract DeployCore is Script {
         string denominationSymbol;
         address denominationAsset;
         uint256 positionsLimit;
+        bool bigBlocksRequired; // config.deployment.bigBlocksRequired (HyperEVM: contracts exceed the 3M small-block gas limit)
         address gasRelayHub;
         address gasRelayForwarder;
         uint256 gasRelayDepositCooldown;
@@ -321,9 +322,31 @@ contract DeployCore is Script {
         if (_a.listCreated) {
             vm.serializeUint(o, "approvedAdaptersListId", _a.approvedAdaptersListId);
         }
+        _serializeBigBlocks(o, _c, pending);
         string memory out = vm.serializeString(o, "addresses", addrJson);
         _writeRecord(path, out);
         console2.log("wrote", path);
+    }
+
+    /// @dev HyperEVM-style dual-block chains: records (additively, only when config.deployment.bigBlocksRequired) the block gas
+    /// limit of the run. Fork records also get `bigBlocksEmulated`: true iff that limit is at least 30M, i.e. the limit of a
+    /// HyperEVM big block. A local Anvil fork cannot ENFORCE the 3M small-block cap or route transactions into big blocks; it
+    /// can only run with a 30M block gas limit, hence "emulated". Pending (real broadcast) records get NO boolean: the script
+    /// cannot verify that the deployer has big blocks enabled, so it only records the simulation gas limit and the note.
+    uint256 internal constant BIG_BLOCK_GAS_LIMIT = 30_000_000;
+
+    function _serializeBigBlocks(string memory _o, Cfg memory _c, bool _pending) internal {
+        if (!_c.bigBlocksRequired) return;
+        uint256 gasLimit = _blockGasLimit();
+        if (!_pending) vm.serializeBool(_o, "bigBlocksEmulated", gasLimit >= BIG_BLOCK_GAS_LIMIT);
+        vm.serializeUint(_o, "blockGasLimit", gasLimit);
+        vm.serializeString(
+            _o,
+            "bigBlocksNote",
+            _pending
+                ? "Simulation block gas limit shown. The deployer must have HyperEVM big blocks enabled (L1 action evmUserModify usingBigBlocks=true) when broadcasting: ComptrollerLib/VaultLib/FundDeployer exceed the 3M small-block gas limit. This script cannot verify that; script/finalize-broadcast.sh checks receipts only."
+                : "A local Anvil fork cannot enforce HyperEVM's 3M small-block gas cap; this run used the block gas limit shown (>= 30M means big-block conditions were emulated). ComptrollerLib/VaultLib/FundDeployer exceed 3M gas, so a real deployment needs the deployer to enable big blocks (L1 action evmUserModify usingBigBlocks=true)."
+        );
     }
 
     function _addressesJson(Persistent memory _p, Release memory _r, Adapters memory _a)
@@ -396,6 +419,10 @@ contract DeployCore is Script {
         return VmContext(address(vm)).isContext(6) || VmContext(address(vm)).isContext(7);
     }
 
+    function _blockGasLimit() internal virtual returns (uint256) {
+        return block.gaslimit;
+    }
+
     /// @dev True iff the RPC answers Anvil's `anvil_nodeInfo`. Real nodes reject it.
     function _isAnvil() internal virtual returns (bool) {
         try VmRpc(address(vm)).rpc("anvil_nodeInfo", "[]") returns (bytes memory) {
@@ -438,6 +465,9 @@ contract DeployCore is Script {
         c_.positionsLimit = vm.parseJsonUint(json, ".release.vaultPositionsLimit");
         c_.ethUsdAggregator = vm.parseJsonAddress(json, ".chainlink.ethUsdAggregator.address");
         c_.mlnBurner = vm.envOr("MLN_BURNER", address(0));
+        if (VmKeyExists(address(vm)).keyExistsJson(json, ".deployment.bigBlocksRequired")) {
+            c_.bigBlocksRequired = vm.parseJsonBool(json, ".deployment.bigBlocksRequired");
+        }
 
         // MLN is only read when the buyback feature is on; otherwise address(0) (TODO on that chain)
         if (vm.parseJsonBool(json, ".features.protocolFeeBuyback")) {

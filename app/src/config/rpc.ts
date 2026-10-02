@@ -9,7 +9,7 @@
  * resolver stays unit-testable.
  */
 
-export const RPC_CHAIN_KEYS = ["ethereum", "base", "robinhood", "arbitrum"] as const;
+export const RPC_CHAIN_KEYS = ["ethereum", "base", "robinhood", "arbitrum", "hyperevm"] as const;
 export type RpcChainKey = (typeof RPC_CHAIN_KEYS)[number];
 
 /** Env var that overrides the RPC endpoint of each chain. */
@@ -18,6 +18,7 @@ export const RPC_ENV_VARS = {
   base: "NEXT_PUBLIC_RPC_URL_BASE",
   robinhood: "NEXT_PUBLIC_RPC_URL_ROBINHOOD",
   arbitrum: "NEXT_PUBLIC_RPC_URL_ARBITRUM",
+  hyperevm: "NEXT_PUBLIC_RPC_URL_HYPEREVM",
 } as const satisfies Record<RpcChainKey, string>;
 
 /**
@@ -29,6 +30,8 @@ export const DEFAULT_RPC_URLS = {
   base: "https://mainnet.base.org",
   robinhood: "https://rpc.mainnet.chain.robinhood.com",
   arbitrum: "https://arb1.arbitrum.io/rpc",
+  // Read-only public endpoint of the Hyperliquid docs; rate-limited, no websocket (eth_chainId = 0x3e7 checked 2026-10-02).
+  hyperevm: "https://rpc.hyperliquid.xyz/evm",
 } as const satisfies Record<RpcChainKey, string>;
 
 export type RpcUrls = Record<RpcChainKey, string>;
@@ -53,13 +56,14 @@ export function resolveRpcUrl(chain: RpcChainKey, override: string | undefined):
   return value;
 }
 
-/** Resolve all four endpoints from a map of raw override values (keyed by chain). */
+/** Resolve all endpoints from a map of raw override values (keyed by chain). */
 export function resolveRpcUrls(env: RpcEnv = {}): RpcUrls {
   return {
     ethereum: resolveRpcUrl("ethereum", env.ethereum),
     base: resolveRpcUrl("base", env.base),
     robinhood: resolveRpcUrl("robinhood", env.robinhood),
     arbitrum: resolveRpcUrl("arbitrum", env.arbitrum),
+    hyperevm: resolveRpcUrl("hyperevm", env.hyperevm),
   };
 }
 
@@ -73,6 +77,7 @@ export function readRpcEnv(): RpcEnv {
     base: process.env.NEXT_PUBLIC_RPC_URL_BASE,
     robinhood: process.env.NEXT_PUBLIC_RPC_URL_ROBINHOOD,
     arbitrum: process.env.NEXT_PUBLIC_RPC_URL_ARBITRUM,
+    hyperevm: process.env.NEXT_PUBLIC_RPC_URL_HYPEREVM,
   };
 }
 

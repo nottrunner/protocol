@@ -9,6 +9,7 @@ vaults (Enzyme-fork contracts in this repo) on:
 | Base | 8453 | yes | yes | yes (not via the Uniswap v3 adapter, see below) |
 | Arbitrum One | 42161 | yes | yes | yes |
 | Robinhood Chain | 4663 | yes | yes | **hidden / disabled** (phase 1) |
+| HyperEVM | 999 | yes | yes | **hidden / disabled** (phase 1; USDC denomination, swaps are phase 2) |
 
 Flags live in `src/config/features.ts`. Rationale: Robinhood Chain has no Enzyme deployment yet, and the repo's
 `UniswapV3Adapter` targets the original SwapRouter, not SwapRouter02 (used on Base and Robinhood Chain).
@@ -31,9 +32,9 @@ Scripts: `npm run lint`, `npm run typecheck`, `npm test` (vitest), `npm run buil
 ## Configuration
 
 - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`: optional. Without it only injected + Coinbase wallets are offered.
-- `NEXT_PUBLIC_RPC_URL_{ETHEREUM,BASE,ROBINHOOD,ARBITRUM}`: optional per-chain RPC overrides. Defaults are public
+- `NEXT_PUBLIC_RPC_URL_{ETHEREUM,BASE,ROBINHOOD,ARBITRUM,HYPEREVM}`: optional per-chain RPC overrides. Defaults are public
   endpoints (`ethereum-rpc.publicnode.com`, `mainnet.base.org`, `rpc.mainnet.chain.robinhood.com`,
-  `arb1.arbitrum.io/rpc`) that are rate-limited; use a dedicated provider in production. Unset or empty means
+  `arb1.arbitrum.io/rpc`, `rpc.hyperliquid.xyz/evm`) that are rate-limited; use a dedicated provider in production. Unset or empty means
   "use the default". Resolution lives in `src/config/rpc.ts` and feeds both the chain definitions and the wagmi
   transports. See `.env.example`.
 - Deployment addresses: see [Deployment addresses](#deployment-addresses) below (`deployments/<chain>.json` records +
@@ -44,6 +45,11 @@ Everything `NEXT_PUBLIC_*` is shipped to the browser. Never put secrets in them.
 Robinhood Chain is defined with `defineChain` in `src/config/chains.ts`: id 4663, ETH gas token, RPC
 `https://rpc.mainnet.chain.robinhood.com`, explorer `https://robinhoodchain.blockscout.com` (per
 docs.robinhood.com; `eth_chainId` on the RPC returns 0x1237).
+
+HyperEVM is defined the same way: id 999, native token **HYPE** (18 decimals), RPC `https://rpc.hyperliquid.xyz/evm` (read-only public
+endpoint; `eth_chainId` returns 0x3e7), explorer `https://hyperevmscan.io`. Known tokens: Circle-native USDC
+`0xb88339CB7199b77E23DB6E890353E22632Ba630f` (denomination asset) and Wrapped HYPE. Fork it with `--chain-id 999 --gas-limit 30000000`
+(see `qa/fixtures.json`).
 
 ### Pointing a build at a local fork
 
@@ -62,7 +68,7 @@ NEXT_PUBLIC_RPC_URL_ETHEREUM=http://127.0.0.1:8545 npm run build && npm start
 
 Notes:
 
-- Use the matching var per chain (`..._BASE`, `..._ROBINHOOD`, `..._ARBITRUM`); chains left unset keep their public
+- Use the matching var per chain (`..._BASE`, `..._ROBINHOOD`, `..._ARBITRUM`, `..._HYPEREVM`); chains left unset keep their public
   defaults. Fork several chains on different ports (8545, 8546, ...) and set each var.
 - `NEXT_PUBLIC_*` values are inlined at **build** time: restart `npm run dev` / rebuild after changing them.
 - Values must be `http(s)` URLs; an invalid value throws on startup. Blank is treated as unset.
@@ -76,7 +82,7 @@ For QA / E2E runs against a local Anvil (fork) with **no wallet extension**. Whe
 connect modal gets an **E2E Mock Wallet** option (group "Test only"). It is a wagmi connector backed by a viem local
 account: it signs messages, typed data and transactions in the page and broadcasts the raw transaction through the
 chain's configured wagmi transport, i.e. the `NEXT_PUBLIC_RPC_URL_*` endpoints from `src/config/rpc.ts`. It can
-connect and switch across all four chains (Ethereum, Base, Arbitrum One, Robinhood Chain).
+connect and switch across all five chains (Ethereum, Base, Arbitrum One, Robinhood Chain, HyperEVM).
 
 **It never ships to production.** The signing key is Anvil's public account #0 key (and mnemonic), so anything sent to
 those addresses on a real chain is stolen immediately. Three layers keep it out of production:
@@ -180,7 +186,7 @@ log-scan start on Orbit chains; fork records use `forkBlock`; otherwise scans us
 | `/portfolio/<chain>/<vault>` | view (name, symbol, owner, denomination, shares, share price, NAV/GAV, holdings with value), **deposit** (approve + `buyShares` with a `minSharesQuantity` slippage bound), **redeem** (in kind, or into the denomination asset only), **swap** (owner / asset manager) | AC-3, AC-5, AC-4, AC-6 |
 | `/portfolio` | "My portfolios": `NewFundCreated` log scan (adaptive chunking, starts at the record's block) for vaults **created by** the connected account + vaults remembered in this browser + paste-an-address fallback | AC-6 |
 
-Everything is addressed by URL (`/portfolio/ethereum|base|arbitrum|robinhood/0xVault`), so reload / deep links work (AC-6).
+Everything is addressed by URL (`/portfolio/ethereum|base|arbitrum|robinhood|hyperevm/0xVault`), so reload / deep links work (AC-6).
 
 **Swap routes (AC-4).** The swap card exists only where the chain's record lists at least one eligible adapter, and always shows
 the route (adapter) selector: Ethereum / Arbitrum offer `UniswapV3Adapter` (default) and `ParaSwapV6Adapter`; Base offers
