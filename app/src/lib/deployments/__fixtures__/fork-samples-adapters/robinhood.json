@@ -1,0 +1,47 @@
+{
+  "addresses": {
+    "addressListRegistry": "0x90e49f941bd68341A363225F5A2386D34a7FFd92",
+    "comptrollerLib": "0x4ef58923c7e99598DAEB00CCE5315cAD9Efa3761",
+    "dispatcher": "0x19CC4DD8D86FC525f8CF37c51612DE91b1E52038",
+    "externalPositionFactory": "0x68BBC41dFd9CeDF8c7D37A171641F6F3300e5443",
+    "externalPositionManager": "0xBd422978E222C626b94e66f33791a61FbE662115",
+    "feeManager": "0x67b444dB2581920A7Bb4FB07f6B19D614B7f6ACA",
+    "fundDeployer": "0x81AE7583f06C2Bc141b9141FB9D701F0F2f59133",
+    "fundValueCalculator": "0xaEDA30eC4368181EFa71Ea32fb57c673Ab930f8f",
+    "fundValueCalculatorRouter": "0xDeCFC2c6dDFf24579d5924484a9033Ce0563DBf4",
+    "gasRelayPaymasterFactory": "0xAa07486C20F73fF4309495411927E6AE7C884DBa",
+    "globalConfigProxy": "0x0c269682E71B2Dc923641B948F63b85CFb31E95b",
+    "integrationManager": "0x3A41dfF0bB941fC5A1392c4f06cD1113b06c3eE2",
+    "policyManager": "0x6fc6A5b592406D9ee1e9a4e6BA20E03e73165B3A",
+    "protocolFeeReserveProxy": "0x4A0a7843BbC7d33e4824cb5bdb531f0E195B64E1",
+    "protocolFeeTracker": "0xAA2a95A342b774512c64799597bD75389e7d3C7a",
+    "uintListRegistry": "0x6699A372477f62caA0B0e3465CDA30E789a8F815",
+    "valueInterpreter": "0xEd00171E28B55C3ba9bE26a474611755C860E6F0",
+    "vaultLib": "0xd831912d86BE956A131cfe14E90C86c717407489"
+  },
+  "blockNumberAtDeploy": 78132471,
+  "blockNumberNote": "blockNumberAtDeploy and forkBlock are chain-native block numbers (eth_blockNumber; L2 blocks on arbitrum/robinhood). evmBlockNumberAtDeploy is block.number as seen inside the EVM (the L1 block number on arbitrum/robinhood).",
+  "blockTimestampAtDeploy": 1790934147,
+  "chain": "robinhood",
+  "chainId": 4663,
+  "chainlinkStaleRateThresholdSeconds": 172800,
+  "configSha256": "141c6245077a66ccc99c5afbcdb6dd8f6db8d6c30969d3211f3a3cb28730aae6",
+  "denominationAsset": {
+    "address": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+    "symbol": "USDG"
+  },
+  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "evmBlockNumberAtDeploy": 26103815,
+  "forkBlock": 78132470,
+  "kind": "fork, not mainnet",
+  "label": "ANVIL FORK RUN - NOT A MAINNET DEPLOYMENT. Addresses exist only on a throwaway local fork.",
+  "mainnet": false,
+  "runKind": "fork",
+  "scriptCommit": "653c4a2675cba1904e107720add434dffeda15fb",
+  "scriptTreeDirty": "false",
+  "log": {
+    "path": "deployments/logs/robinhood.fork-run.txt",
+    "sha256": "5860b1479176603fd8140ed4fa0140ff22ac678dd215939e34ea3aabdf2233be"
+  },
+  "reproduce": "script/fork-dry-run.sh robinhood 78132470  (same commit + same fork block + same sender => same addresses)"
+}

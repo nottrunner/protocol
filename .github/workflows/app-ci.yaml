@@ -1,7 +1,7 @@
 name: App CI
 on:
   pull_request:
-    branches: [dev]
+    branches: [dev, "feat/app-**"]   # stacked app PRs target feat/app-* branches
     paths:
       - "app/**"
       - ".github/workflows/app-ci.yaml"
@@ -46,9 +46,35 @@ jobs:
           if NEXT_PUBLIC_E2E_MOCK_WALLET=1 VERCEL_ENV=production npm run check:e2e-guard; then
             echo "::error::E2E mock wallet guard did not fail for VERCEL_ENV=production"; exit 1
           fi
-      - run: npm run build
+      # Fork deployment records (addresses that exist only on a local fork) must never ship in a production build either.
+      - name: Guard rejects the fork-deployments flag on a Vercel production build
+        run: |
+          if NEXT_PUBLIC_USE_FORK_DEPLOYMENTS=1 VERCEL_ENV=production npm run check:fork-guard; then
+            echo "::error::fork deployments guard did not fail for VERCEL_ENV=production"; exit 1
+          fi
+          if NEXT_PUBLIC_USE_FORK_DEPLOYMENTS=1 VERCEL_TARGET_ENV=production npm run check:fork-guard; then
+            echo "::error::fork deployments guard did not fail for VERCEL_TARGET_ENV=production"; exit 1
+          fi
+      - name: Production-mode build with the fork flag fails (prebuild bypassed)
+        run: |
+          if NEXT_PUBLIC_USE_FORK_DEPLOYMENTS=1 VERCEL_ENV=production npx next build; then
+            echo "::error::next build accepted the fork flag in production"; exit 1
+          fi
+          rm -rf .next
+      # Default build, pointed at the fork-sample records: they must be dropped (flag off).
+      - name: Build without the fork flag; fork-only data must be absent from the bundle
+        run: |
+          rm -rf .next
+          DEPLOYMENTS_DIR=src/lib/deployments/__fixtures__/fork-samples npm run build
+          npm run verify:fork-bundle -- absent src/lib/deployments/__fixtures__/fork-samples
       - name: Assert mock wallet connector and test key are absent from the default build
         run: npm run verify:bundle -- absent
+      - name: Build with the fork flag (QA build) and assert fork records are present
+        run: |
+          rm -rf .next
+          NEXT_PUBLIC_USE_FORK_DEPLOYMENTS=1 DEPLOYMENTS_DIR=src/lib/deployments/__fixtures__/fork-samples npm run build
+          npm run verify:fork-bundle -- present src/lib/deployments/__fixtures__/fork-samples
+          rm -rf .next
       - name: Build with the mock wallet flag (QA build) and assert it is present
         run: |
           rm -rf .next

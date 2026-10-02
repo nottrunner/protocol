@@ -26,6 +26,7 @@ export function useSelectedChain() {
       readChainId = id;
       listeners.forEach((l) => l());
     },
-    can: (feature: Feature) => isFeatureEnabled(chainId, feature),
+    /** Feature flag for `forChainId` (pages bound to a URL chain pass it); defaults to the wallet / selected chain. */
+    can: (feature: Feature, forChainId?: number) => isFeatureEnabled(forChainId ?? chainId, feature),
   };
 }

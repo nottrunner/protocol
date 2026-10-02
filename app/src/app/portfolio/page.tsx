@@ -1,12 +1,12 @@
 import { Suspense } from "react";
-import { PortfolioView } from "@/components/PortfolioView";
+import { MyPortfolios } from "@/components/MyPortfolios";
 
-export default function PortfolioPage() {
+export default function PortfolioIndexPage() {
   return (
     <>
-      <h1>View portfolio</h1>
+      <h1>Portfolios</h1>
       <Suspense fallback={<p className="muted">Loading…</p>}>
-        <PortfolioView />
+        <MyPortfolios />
       </Suspense>
     </>
   );

@@ -43,3 +43,29 @@ export function explorerUrl(chainId: number, path: string = ""): string | undefi
   const base = getChain(chainId)?.blockExplorers?.default.url;
   return base ? `${base}${path}` : undefined;
 }
+
+/** URL slugs for /portfolio/<chain>/<vault>. */
+export const chainSlugs: Record<SupportedChainId, string> = {
+  1: "ethereum",
+  8453: "base",
+  42161: "arbitrum",
+  4663: "robinhood",
+};
+
+export function chainSlug(chainId: number): string | undefined {
+  return (chainSlugs as Record<number, string | undefined>)[chainId];
+}
+
+/** Accepts a slug ("base") or a numeric chain id ("8453"); returns the supported chain id or undefined. */
+export function chainIdFromParam(param: string | undefined): SupportedChainId | undefined {
+  if (!param) return undefined;
+  const p = decodeURIComponent(param).toLowerCase();
+  const bySlug = (Object.entries(chainSlugs) as [string, string][]).find(([, slug]) => slug === p);
+  if (bySlug) return Number(bySlug[0]) as SupportedChainId;
+  const n = Number(p);
+  return Number.isInteger(n) && isSupportedChainId(n) ? n : undefined;
+}
+
+export function portfolioPath(chainId: number, vault: string): string {
+  return `/portfolio/${chainSlug(chainId) ?? chainId}/${vault}`;
+}
