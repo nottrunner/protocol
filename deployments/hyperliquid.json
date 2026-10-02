@@ -22,9 +22,9 @@
   "bigBlocksEmulated": true,
   "bigBlocksNote": "A local Anvil fork cannot enforce HyperEVM's 3M small-block gas cap; this run used the block gas limit shown (>= 30M means big-block conditions were emulated). ComptrollerLib/VaultLib/FundDeployer exceed 3M gas, so a real deployment needs the deployer to enable big blocks (L1 action evmUserModify usingBigBlocks=true).",
   "blockGasLimit": 30000000,
-  "blockNumberAtDeploy": 47477198,
+  "blockNumberAtDeploy": 47483593,
   "blockNumberNote": "blockNumberAtDeploy and forkBlock are chain-native block numbers (eth_blockNumber; L2 blocks on arbitrum/robinhood). evmBlockNumberAtDeploy is block.number as seen inside the EVM (the L1 block number on arbitrum/robinhood).",
-  "blockTimestampAtDeploy": 1790955407,
+  "blockTimestampAtDeploy": 1790961696,
   "chain": "hyperliquid",
   "chainId": 999,
   "chainlinkStaleRateThresholdSeconds": 172800,
@@ -34,18 +34,18 @@
     "symbol": "USDC"
   },
   "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-  "evmBlockNumberAtDeploy": 47477198,
-  "forkBlock": 47477197,
+  "evmBlockNumberAtDeploy": 47483593,
+  "forkBlock": 47483592,
   "kind": "fork, not mainnet",
   "label": "ANVIL FORK RUN - NOT A MAINNET DEPLOYMENT. Addresses exist only on a throwaway local fork.",
   "mainnet": false,
   "runKind": "fork",
-  "scriptCommit": "3b839411bf4444eef834eebbbdd8559b4ef75fd1",
+  "scriptCommit": "47452de8f9fab6c856b48af9e400284f5ada2136",
   "scriptTreeDirty": "false",
   "simulated": false,
   "log": {
     "path": "deployments/logs/hyperliquid.fork-run.txt",
-    "sha256": "90847da50e0708c5d9bdda7645016761912e0112446f7bb377d16ef24f1ca48b"
+    "sha256": "cc843ba85bec94306369633896144b177ebe48aa9f3bc9b9518b55868e90dd6f"
   },
-  "reproduce": "BROADCAST_LOCAL=1 script/fork-dry-run.sh hyperliquid 47477197  (same commit + same fork block + same sender => same addresses)"
+  "reproduce": "BROADCAST_LOCAL=1 script/fork-dry-run.sh hyperliquid 47483592  (same commit + same fork block + same sender => same addresses)"
 }
