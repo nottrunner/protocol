@@ -34,13 +34,13 @@ r_: struct DeployCore.Release Release({ gasRelayPaymasterFactory: 0xAa07486C20F7
 
 Chain 4663
 
-Estimated max fee per gas: 0.049701317 gwei
-Estimated base fee per gas: 0.024850658 gwei
+Estimated max fee per gas: 0.056794503 gwei
+Estimated base fee per gas: 0.028397251 gwei
 Estimated max priority fee per gas: 0.000000001 gwei
 
 Estimated total gas used for script: 48100104
 
-Estimated amount required: 0.002390638516636968 ETH
+Estimated amount required: 0.002731821500928312 ETH
 
 ==========================
 

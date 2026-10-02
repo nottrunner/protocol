@@ -6,7 +6,7 @@ p_: struct DeployCore.Persistent Persistent({ dispatcher: 0x6cEE3AC97C67E0B39238
 r_: struct DeployCore.Release Release({ gasRelayPaymasterFactory: 0x193570f6D9eBA8aa520b8F2243EA2fF4c4555e01, fundDeployer: 0x26b8af9c63f88044D0a842536Cd7661C4FC53F83, protocolFeeTracker: 0x910fe3cbAbb23DD5Bb86dB4fB1E2A8872afFc92B, valueInterpreter: 0xe9388c7B36931ca983751F065C69a3ACA7195CBB, policyManager: 0x5A8d6042B0F36a5b4BF30894F16E558E46D5f922, externalPositionManager: 0xF1CB82EF2c15c29C3a0EAc7154fE1956AFB16a99, feeManager: 0x0BbFf66C00821d1e77507B739eFc348Ec8eb287D, integrationManager: 0x523609B8AbDD37EcbA4f8BD7C504f205359c4df5, comptrollerLib: 0x9006EfE7f9BdAc9a9a411A1c2d942CAf9E18f1d7, vaultLib: 0xa574068D02f662BB73C7bE69280c13Bb552F92b0, fundValueCalculator: 0x5BF7b52B1F7782d8B5f76040de2aB02f9E5E0c4a })
 
 == Logs ==
-  1 WETH in first primitive (raw units): 2750066358
+  1 WETH in first primitive (raw units): 2745140058
   == DeployCore: base chainid 8453
   dispatcher 0x6cEE3AC97C67E0B39238fb564faf10218C59a6e9
   addressListRegistry 0x48D705f1d64E7Ffe3EFcE15D8d8061b20aB4C929
@@ -34,13 +34,13 @@ r_: struct DeployCore.Release Release({ gasRelayPaymasterFactory: 0x193570f6D9eB
 
 Chain 8453
 
-Estimated max fee per gas: 0.010819205 gwei
-Estimated base fee per gas: 0.004972102 gwei
-Estimated max priority fee per gas: 0.000875001 gwei
+Estimated max fee per gas: 0.010418003 gwei
+Estimated base fee per gas: 0.004994832 gwei
+Estimated max priority fee per gas: 0.000428339 gwei
 
 Estimated total gas used for script: 48563211
 
-Estimated amount required: 0.000525415335267255 ETH
+Estimated amount required: 0.000505931677887633 ETH
 
 ==========================
 
