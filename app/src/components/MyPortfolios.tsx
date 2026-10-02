@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { isAddress, type Address } from "viem";
 import { useAccount, useConfig } from "wagmi";
 import { chainIdFromParam, portfolioPath } from "@/config/chains";
 import {
-  loadSavedVaults, readPortfolio, removeSaved, storeSavedVaults, useDeployment, useMyPortfolios, type SavedVaults,
+  loadSavedVaults, readPortfolio, removeSaved, savedVaultStatus, storeSavedVaults, useDeployment, useMyPortfolios, verifyVault, type SavedVaults,
 } from "@/lib/contracts";
 import { DeploymentNotices } from "./DeploymentNotices";
 import { Notice } from "./Notice";
@@ -86,10 +87,10 @@ export function MyPortfolios() {
           </li>
         ))}
         {savedHere.map((a) => (
-          <li key={a} data-testid="my-portfolio-item">
-            <Link href={portfolioPath(chainId, a)}>{a}</Link> <span className="muted small">saved</span>{" "}
-            <button className="chip" type="button" onClick={() => { const n = removeSaved(loadSavedVaults(), chainId, a); storeSavedVaults(n); setSaved(n); }}>remove</button>
-          </li>
+          <SavedItem
+            key={a} chainId={chainId} vault={a}
+            onRemove={() => { const n = removeSaved(loadSavedVaults(), chainId, a); storeSavedVaults(n); setSaved(n); }}
+          />
         ))}
         {isConnected && !my.isLoading && fromLogs.length === 0 && savedHere.length === 0 && <li className="muted">No portfolios found for this account on {chain?.name}.</li>}
       </ul>
@@ -108,5 +109,31 @@ export function MyPortfolios() {
         beyond the RPC&apos;s log range, can be opened by pasting the vault address; vaults you open are remembered in this browser once the Dispatcher has verified them. The page only enables deposit / redeem / swap for verified vaults.
       </p>
     </>
+  );
+}
+
+/**
+ * A vault saved in this browser (possibly by an earlier app version that saved before verifying). Re-verified with the
+ * Dispatcher on display and annotated; fails closed (any error / mismatch => "unverified"). The vault page gates actions anyway.
+ */
+function SavedItem({ chainId, vault, onRemove }: { chainId: number; vault: string; onRemove: () => void }) {
+  const config = useConfig();
+  const q = useQuery({
+    queryKey: ["saved-vault-verification", chainId, vault.toLowerCase()],
+    retry: 0,
+    staleTime: 15_000,
+    queryFn: () => verifyVault(config, { chainId, vault }),
+  });
+  const status = savedVaultStatus(q.data, q.isError);
+  return (
+    <li data-testid="my-portfolio-item" data-saved-status={status}>
+      <Link href={portfolioPath(chainId, vault)}>{vault}</Link>{" "}
+      {status === "verified" && <span className="muted small">saved</span>}
+      {status === "checking" && <span className="muted small" data-testid="saved-checking">saved · verifying…</span>}
+      {status === "unverified" && (
+        <span className="small" style={{ color: "#b42318" }} data-testid="saved-unverified">unverified (saved by an earlier version): actions are disabled for it</span>
+      )}{" "}
+      <button className="chip" type="button" onClick={onRemove}>remove</button>
+    </li>
   );
 }

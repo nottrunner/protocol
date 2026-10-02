@@ -21,7 +21,7 @@ describe("fork-samples shapes", () => {
       const d = resolveChainDeployment(id, { records: forkRecords, useFork: false, env: {} });
       expect(d.fundDeployer).toBeNull();
       expect(d.origin).toBe("none");
-      expect(d.notes.join(" ")).toMatch(/fork deployment record ignored/);
+      expect(d.notes.join(" ")).toMatch(/fork deployment records for this chain are not enabled in this build/);
     }
   });
 

@@ -115,3 +115,14 @@ export async function assertVerifiedVault(config: Config, args: { chainId: numbe
   const v = await verifyVault(config, args);
   if (v.status !== "verified") throw new UnverifiedVaultError(v.reason, v.detail);
 }
+
+/**
+ * Label for a vault listed under "My portfolios" that was saved by an earlier app version (before verification existed).
+ * Fails closed: only a definite `verified` result is shown as verified; a pending check is "checking"; everything else
+ * (mismatch, revert, RPC error, zero address, no FundDeployer) is shown as unverified. The vault page gates actions regardless.
+ */
+export function savedVaultStatus(v: VaultVerification | undefined, failed = false): "checking" | "verified" | "unverified" {
+  if (failed) return "unverified";
+  if (!v) return "checking";
+  return v.status === "verified" ? "verified" : "unverified";
+}

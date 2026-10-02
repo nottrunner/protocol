@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { augustusV6Abi, comptrollerAbi } from "./abis";
 import {
   ACTION_SELECTOR, TAKE_ORDER_SELECTOR, applySlippage, paraSwapMinOutFloor, quoteWorseBeyondSlippage, decodeAugustusSwapExactAmountIn, encodeCallOnIntegrationArgs, encodeParaSwapAction,
-  encodeSwapCallOnExtension, encodeUniPath, encodeUniTakeOrder, quoteParaSwap, selectorFor, uniCandidates, type FetchLike,
+  encodeSwapCallOnExtension, encodeUniPath, encodeUniTakeOrder, quoteParaSwap, requoteAndExecute, selectorFor, SwapSimulationError, uniCandidates, type FetchLike, type PreparedSwap,
 } from "./swap";
 
 const USDC = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" as const;
@@ -169,5 +169,93 @@ describe("quote safety checks", () => {
     expect(quoteWorseBeyondSlippage(BigInt(1000), BigInt(990), 100)).toBe(false); // exactly 1% worse is still within
     expect(quoteWorseBeyondSlippage(BigInt(1000), BigInt(989), 100)).toBe(true);
     expect(quoteWorseBeyondSlippage(BigInt(1000), BigInt(999), 0)).toBe(true);
+  });
+});
+
+describe("requoteAndExecute (re-quote guard applied to every quote, incl. ParaSwap retries)", () => {
+  const mk = (expectedOut: bigint, exchanges: string[] = ["A"]): PreparedSwap => ({
+    route: { kind: "paraSwapV6", address: ADAPTER, label: "ParaSwap" } as unknown as PreparedSwap["route"],
+    selector: ACTION_SELECTOR, integrationData: "0x", tokenIn: USDC, tokenOut: WETH, amountIn: 1n,
+    expectedOut, minOut: expectedOut, description: "x", exchanges,
+  });
+  const SLIP = 100; // 1%
+  const shown = mk(1000n);
+  const sim = () => new SwapSimulationError(new Error("revert"));
+
+  it("sends the first fresh quote when it is within slippage of the shown one", async () => {
+    const sent: PreparedSwap[] = [];
+    const out = await requoteAndExecute({
+      shown, slippageBps: SLIP, isParaSwap: true, prepare: async () => mk(995n),
+      execute: async (q) => { sent.push(q); return "ok"; },
+    });
+    expect(out.status).toBe("sent");
+    expect(sent).toHaveLength(1);
+  });
+
+  it("refuses (sends nothing) when the first fresh quote is worse beyond slippage, and reports the new quote", async () => {
+    const seen: bigint[] = [];
+    let executed = 0;
+    const out = await requoteAndExecute({
+      shown, slippageBps: SLIP, isParaSwap: true, prepare: async () => mk(980n),
+      execute: async () => { executed++; return "ok"; }, onQuote: (q) => seen.push(q.expectedOut),
+    });
+    expect(out.status).toBe("moved");
+    expect(executed).toBe(0);
+    expect(seen).toEqual([980n]);
+  });
+
+  it("retry loop: a worse re-quote after a failed simulation is compared with the SHOWN quote and refused (not sent)", async () => {
+    // first fresh quote is fine (999) but its simulation reverts; the retry (excluding its source) is 970 (> 1% worse than 1000)
+    const quotes = [mk(999n, ["A"]), mk(970n, ["B"])];
+    const excludedArgs: (string[] | undefined)[] = [];
+    const executedOut: bigint[] = [];
+    let retried: string[] | undefined;
+    const out = await requoteAndExecute({
+      shown, slippageBps: SLIP, isParaSwap: true,
+      prepare: async (ex) => { excludedArgs.push(ex); return quotes.shift()!; },
+      execute: async (q) => { executedOut.push(q.expectedOut); throw sim(); },
+      onRetry: (f) => { retried = f; },
+    });
+    expect(out.status).toBe("moved");
+    if (out.status === "moved") expect(out.fresh.expectedOut).toBe(970n);
+    expect(executedOut).toEqual([999n]); // the 970 quote was never executed
+    expect(excludedArgs).toEqual([undefined, ["A"]]);
+    expect(retried).toEqual(["A"]);
+  });
+
+  it("retry loop: a re-quote within slippage of the shown quote is executed", async () => {
+    const quotes = [mk(999n, ["A"]), mk(992n, ["B"])];
+    const executedOut: bigint[] = [];
+    const out = await requoteAndExecute({
+      shown, slippageBps: SLIP, isParaSwap: true, prepare: async () => quotes.shift()!,
+      execute: async (q) => { executedOut.push(q.expectedOut); if (executedOut.length === 1) throw sim(); return "done"; },
+    });
+    expect(out.status).toBe("sent");
+    expect(executedOut).toEqual([999n, 992n]);
+  });
+
+  it("compares each retry with the shown quote, not the previous retry (slow drift is caught)", async () => {
+    // 1000 shown -> 995 (ok, reverts) -> 990 (ok vs 1000, reverts) -> 985 would be fine vs previous but still ok vs shown; use 980 = worse vs shown
+    const quotes = [mk(995n, ["A"]), mk(991n, ["B"]), mk(985n, ["C"]), mk(979n, ["D"])];
+    const executedOut: bigint[] = [];
+    const out = await requoteAndExecute({
+      shown, slippageBps: 150, isParaSwap: true, maxExcluded: 5, prepare: async () => quotes.shift()!,
+      execute: async (q) => { executedOut.push(q.expectedOut); throw sim(); },
+    });
+    expect(executedOut).toEqual([995n, 991n, 985n]);
+    expect(out.status).toBe("moved"); // 979 < 1000 * (1 - 1.5%) = 985
+  });
+
+  it("non-simulation errors and non-ParaSwap routes are rethrown without retry", async () => {
+    await expect(requoteAndExecute({
+      shown, slippageBps: SLIP, isParaSwap: true, prepare: async () => mk(1000n),
+      execute: async () => { throw new Error("user rejected"); },
+    })).rejects.toThrow("user rejected");
+    let prepares = 0;
+    await expect(requoteAndExecute({
+      shown, slippageBps: SLIP, isParaSwap: false, prepare: async () => { prepares++; return mk(1000n); },
+      execute: async () => { throw sim(); },
+    })).rejects.toBeInstanceOf(SwapSimulationError);
+    expect(prepares).toBe(1);
   });
 });
