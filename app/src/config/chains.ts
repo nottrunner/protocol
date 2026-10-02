@@ -70,6 +70,7 @@ export const chainSlugs: Record<SupportedChainId, string> = {
   8453: "base",
   42161: "arbitrum",
   4663: "robinhood",
+  999: "hyperevm",
 };
 
 export function chainSlug(chainId: number): string | undefined {

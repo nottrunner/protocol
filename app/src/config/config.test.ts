@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hyperEvmChain, robinhoodChain, supportedChains } from "./chains";
+import { chainIdFromParam, chainSlug, hyperEvmChain, portfolioPath, robinhoodChain, supportedChains } from "./chains";
 import { featureFlags, isFeatureEnabled } from "./features";
 import { tokensFor } from "./tokens";
 import { getFundDeployer } from "../lib/contracts/addresses";
@@ -33,6 +33,12 @@ describe("chain + feature config", () => {
   });
   it("HyperEVM has a FundDeployer slot (null until deployed)", () => {
     expect(getFundDeployer(999)).toBeNull();
+  });
+  it("HyperEVM is routable: slug hyperevm / numeric 999 resolve to chain 999", () => {
+    expect(chainSlug(999)).toBe("hyperevm");
+    expect(chainIdFromParam("hyperevm")).toBe(999);
+    expect(chainIdFromParam("999")).toBe(999);
+    expect(portfolioPath(999, "0xabc")).toBe("/portfolio/hyperevm/0xabc");
   });
   it("has flags for every chain", () => {
     for (const c of supportedChains) expect(featureFlags[c.id]).toBeDefined();
