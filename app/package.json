@@ -1,0 +1,36 @@
+{
+  "name": "onchain-portfolio-app",
+  "version": "0.1.0",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "next dev",
+    "prebuild": "node scripts/check-e2e-mock-guard.mjs",
+    "build": "next build",
+    "check:e2e-guard": "node scripts/check-e2e-mock-guard.mjs",
+    "verify:bundle": "node scripts/verify-e2e-mock-bundle.mjs",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@rainbow-me/rainbowkit": "^2.2.11",
+    "@tanstack/react-query": "^5.90.0",
+    "next": "^15.5.27",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "viem": "^2.38.0",
+    "wagmi": "^2.19.5"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "eslint": "^9.39.0",
+    "eslint-config-next": "^15.5.27",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}
