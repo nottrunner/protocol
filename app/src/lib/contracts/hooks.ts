@@ -259,7 +259,7 @@ export function useTokenInfo(chainId: number, token: string | undefined) {
 }
 
 export type PrepareSwapInput = {
-  route: SwapAdapter; tokenIn: TokenInfo; tokenOut: TokenInfo; amountIn: bigint; slippageBps: number;
+  route: SwapAdapter; tokenIn: TokenInfo; tokenOut: TokenInfo; amountIn: bigint; slippageBps: number; excludeDexes?: string[];
 };
 
 /** Quote (prepare) and execute swaps for a vault. Both use the URL chain; execution needs the wallet on that chain. */
@@ -272,7 +272,7 @@ export function useSwap(portfolio: PortfolioData | undefined) {
       if (!portfolio) throw new Error("Vault not ready");
       return prepareSwap(config, (url, init) => fetch(url, init), {
         chainId: portfolio.chainId, vault: portfolio.vault, comptroller: portfolio.comptroller, route: i.route,
-        tokenIn: i.tokenIn, tokenOut: i.tokenOut, amountIn: i.amountIn, slippageBps: i.slippageBps,
+        tokenIn: i.tokenIn, tokenOut: i.tokenOut, amountIn: i.amountIn, slippageBps: i.slippageBps, excludeDexes: i.excludeDexes,
       });
     },
     [config, portfolio],

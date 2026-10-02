@@ -122,7 +122,7 @@ export function encodeParaSwapAction(a: ParaSwapActionArgs): Hex {
 
 export type FetchLike = (url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>;
 
-export type ParaSwapQuote = { expectedOut: bigint; minOut: bigint; action: ParaSwapActionArgs; priceRouteBlock?: number };
+export type ParaSwapQuote = { expectedOut: bigint; minOut: bigint; action: ParaSwapActionArgs; priceRouteBlock?: number; exchanges: string[] };
 
 /**
  * Quote + calldata from the Velora (ParaSwap) API for an exact-in swap executed by `vault`, restricted to the generic
@@ -132,7 +132,7 @@ export type ParaSwapQuote = { expectedOut: bigint; minOut: bigint; action: ParaS
  */
 export async function quoteParaSwap(
   fetchFn: FetchLike,
-  args: { chainId: number; vault: Address; tokenIn: Address; tokenOut: Address; decimalsIn: number; decimalsOut: number; amountIn: bigint; slippageBps: number; apiBase?: string },
+  args: { chainId: number; vault: Address; tokenIn: Address; tokenOut: Address; decimalsIn: number; decimalsOut: number; amountIn: bigint; slippageBps: number; apiBase?: string; excludeDexes?: string[] },
 ): Promise<ParaSwapQuote> {
   const base = args.apiBase ?? PARASWAP_API;
   const q = new URLSearchParams({
@@ -140,8 +140,9 @@ export async function quoteParaSwap(
     destDecimals: String(args.decimalsOut), side: "SELL", network: String(args.chainId), version: "6.2",
     includeContractMethods: "swapExactAmountIn", userAddress: args.vault,
   });
+  if (args.excludeDexes?.length) q.set("excludeDEXS", args.excludeDexes.join(","));
   const pr = await fetchFn(`${base}/prices?${q}`);
-  const prBody = (await pr.json()) as { priceRoute?: { destAmount?: string; blockNumber?: number }; error?: string };
+  const prBody = (await pr.json()) as { priceRoute?: { destAmount?: string; blockNumber?: number; bestRoute?: { swaps?: { swapExchanges?: { exchange?: string }[] }[] }[] }; error?: string };
   if (!pr.ok || !prBody.priceRoute?.destAmount) throw new Error(`ParaSwap price request failed: ${prBody.error ?? pr.status}`);
   const tx = await fetchFn(`${base}/transactions/${args.chainId}?ignoreChecks=true&ignoreGasEstimate=true`, {
     method: "POST",
@@ -158,7 +159,12 @@ export async function quoteParaSwap(
     throw new Error("ParaSwap returned a route for different tokens");
   }
   if (action.swapData.fromAmount !== args.amountIn) throw new Error("ParaSwap returned a different input amount");
-  return { expectedOut: BigInt(prBody.priceRoute.destAmount), minOut: action.swapData.toAmount, action, priceRouteBlock: prBody.priceRoute.blockNumber };
+  const exchanges = [
+    ...new Set(
+      (prBody.priceRoute.bestRoute ?? []).flatMap((r) => (r.swaps ?? []).flatMap((sw) => (sw.swapExchanges ?? []).map((e) => e.exchange ?? ""))).filter(Boolean),
+    ),
+  ];
+  return { expectedOut: BigInt(prBody.priceRoute.destAmount), minOut: action.swapData.toAmount, action, priceRouteBlock: prBody.priceRoute.blockNumber, exchanges };
 }
 
 // ---- prepare + execute ------------------------------------------------------------------------------------------------
@@ -174,6 +180,9 @@ export type PreparedSwap = {
   minOut: bigint;
   /** human description of the path, e.g. "USDC -(0.05%)-> WETH" */
   description: string;
+  /** ParaSwap only: liquidity sources of the quoted route, and sources excluded in this quote */
+  exchanges?: string[];
+  excludedDexes?: string[];
 };
 
 export function selectorFor(kind: SwapAdapterKind): Hex {
@@ -198,18 +207,19 @@ export async function prepareSwap(
   args: {
     chainId: number; vault: Address; comptroller: Address; route: SwapAdapter;
     tokenIn: { address: Address; symbol: string; decimals: number }; tokenOut: { address: Address; symbol: string; decimals: number };
-    amountIn: bigint; slippageBps: number;
+    amountIn: bigint; slippageBps: number; excludeDexes?: string[];
   },
 ): Promise<PreparedSwap> {
   const { route, tokenIn, tokenOut, amountIn, slippageBps } = args;
   if (route.kind === "paraSwapV6") {
     const q = await quoteParaSwap(fetchFn, {
       chainId: args.chainId, vault: args.vault, tokenIn: tokenIn.address, tokenOut: tokenOut.address,
-      decimalsIn: tokenIn.decimals, decimalsOut: tokenOut.decimals, amountIn, slippageBps,
+      decimalsIn: tokenIn.decimals, decimalsOut: tokenOut.decimals, amountIn, slippageBps, excludeDexes: args.excludeDexes,
     });
     return {
       route, selector: ACTION_SELECTOR, integrationData: encodeParaSwapAction(q.action), tokenIn: tokenIn.address, tokenOut: tokenOut.address,
-      amountIn, expectedOut: q.expectedOut, minOut: q.minOut, description: `${tokenIn.symbol} -> ${tokenOut.symbol} via ParaSwap`,
+      amountIn, expectedOut: q.expectedOut, minOut: q.minOut, description: `${tokenIn.symbol} -> ${tokenOut.symbol} via ParaSwap${q.exchanges.length ? ` (${q.exchanges.join(", ")})` : ""}`,
+      exchanges: q.exchanges, excludedDexes: args.excludeDexes ?? [],
     };
   }
   if (!route.quoter) throw new Error("No Uniswap QuoterV2 configured for this chain");
@@ -240,6 +250,16 @@ export function parseCallOnIntegration(logs: readonly Log[], integrationManager:
   return parsed.find((l) => l.address.toLowerCase() === integrationManager.toLowerCase());
 }
 
+/** The pre-send simulation of the swap reverted (nothing was signed or sent). */
+export class SwapSimulationError extends Error {
+  readonly cause: unknown;
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause));
+    this.name = "SwapSimulationError";
+    this.cause = cause;
+  }
+}
+
 export async function swapFlow(
   config: Config,
   args: { chainId: number; account: Address; comptroller: Address; prepared: PreparedSwap },
@@ -251,7 +271,11 @@ export async function swapFlow(
     chainId, account, address: comptroller, abi: comptrollerAbi, functionName: "callOnExtension",
     args: [integrationManager, CALL_ON_INTEGRATION_ACTION, callArgs],
   } as const;
-  await simulateContract(config, callParams);
+  try {
+    await simulateContract(config, callParams);
+  } catch (err) {
+    throw new SwapSimulationError(err);
+  }
   const txHash = await writeContract(config, callParams);
   const receipt = await waitForTransactionReceipt(config, { chainId, hash: txHash });
   if (receipt.status !== "success") throw new Error(`swap transaction reverted (${txHash})`);

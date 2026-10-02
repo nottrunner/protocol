@@ -20,6 +20,7 @@ export {
 } from "./hooks";
 export type { MyPortfolio, CreatePortfolioInput, CreatePortfolioResult, DenominationStatus, DeploymentHealth } from "./hooks";
 export type { PreparedSwap, SwapFlowResult } from "./swap";
+export { SwapSimulationError } from "./swap";
 export type { PrepareSwapInput } from "./hooks";
 export { readPortfolio, readValuation, previewInKindRedemption } from "./portfolio";
 export type { Holding, PortfolioData, TokenInfo, Valuation } from "./portfolio";

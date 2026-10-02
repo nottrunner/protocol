@@ -111,12 +111,14 @@ describe("ParaSwap v6", () => {
     const calls: { url: string; body?: string }[] = [];
     const fetchFn: FetchLike = async (url, init) => {
       calls.push({ url, body: init?.body });
-      if (url.includes("/prices")) return { ok: true, status: 200, json: async () => ({ priceRoute: { destAmount: "303", blockNumber: 5 } }) };
+      if (url.includes("/prices")) return { ok: true, status: 200, json: async () => ({ priceRoute: { destAmount: "303", blockNumber: 5, bestRoute: [{ swaps: [{ swapExchanges: [{ exchange: "tessera" }, { exchange: "UniswapV3" }] }] }, { swaps: [{ swapExchanges: [{ exchange: "tessera" }] }] }] } }) };
       return { ok: true, status: 200, json: async () => ({ data: calldata }) };
     };
     const q = await quoteParaSwap(fetchFn, { chainId: 1, vault: VAULT, tokenIn: USDC, tokenOut: WETH, decimalsIn: 6, decimalsOut: 18, amountIn: BigInt(1_000_000_000), slippageBps: 100 });
     expect(q.expectedOut).toBe(BigInt(303));
     expect(q.minOut).toBe(BigInt(300));
+    expect(q.exchanges).toEqual(["tessera", "UniswapV3"]);
+    expect(calls[0]?.url).not.toContain("excludeDEXS");
     expect(calls[0]?.url).toContain("includeContractMethods=swapExactAmountIn");
     expect(calls[0]?.url).toContain("network=1");
     expect(calls[0]?.url).toContain("version=6.2");
@@ -127,6 +129,15 @@ describe("ParaSwap v6", () => {
     await expect(
       quoteParaSwap(fetchFn, { chainId: 1, vault: VAULT, tokenIn: USDC, tokenOut: WETH, decimalsIn: 6, decimalsOut: 18, amountIn: BigInt(5), slippageBps: 100 }),
     ).rejects.toThrow(/different input amount/);
+  });
+  it("quoteParaSwap can exclude liquidity sources", async () => {
+    const urls: string[] = [];
+    const fetchFn: FetchLike = async (url) => {
+      urls.push(url);
+      return url.includes("/prices") ? { ok: true, status: 200, json: async () => ({ priceRoute: { destAmount: "303" } }) } : { ok: true, status: 200, json: async () => ({ data: calldata }) };
+    };
+    await quoteParaSwap(fetchFn, { chainId: 8453, vault: VAULT, tokenIn: USDC, tokenOut: WETH, decimalsIn: 6, decimalsOut: 18, amountIn: BigInt(1_000_000_000), slippageBps: 100, excludeDexes: ["tessera", "foo"] });
+    expect(decodeURIComponent(urls[0]!)).toContain("excludeDEXS=tessera,foo");
   });
   it("quoteParaSwap surfaces API errors", async () => {
     const fetchFn: FetchLike = async () => ({ ok: false, status: 400, json: async () => ({ error: "No routes found" }) });

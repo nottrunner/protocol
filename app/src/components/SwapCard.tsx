@@ -7,12 +7,14 @@ import { explorerUrl } from "@/config/chains";
 import { tokensFor } from "@/config/tokens";
 import { formatAmount, safeParseUnits, shortAddress } from "@/lib/format";
 import {
-  errorMessage, useDeployment, useSwap, useTokenInfo, type PortfolioData, type PreparedSwap, type SwapFlowResult, type TokenInfo,
+  errorMessage, SwapSimulationError, useDeployment, useSwap, useTokenInfo, type PortfolioData, type PreparedSwap, type SwapFlowResult, type TokenInfo,
 } from "@/lib/contracts";
 import { Notice } from "./Notice";
 
 const SLIPPAGE_OPTIONS = [10, 50, 100, 300]; // bps
 const OTHER = "other";
+
+type ShownResult = SwapFlowResult & { shownIn: TokenInfo; shownOut: TokenInfo };
 
 /**
  * Swap UI (AC-4). Shown only where the chain's deployment lists at least one eligible adapter; the route (adapter) is
@@ -33,8 +35,9 @@ export function SwapCard({ portfolio, disabled, onDone }: { portfolio: Portfolio
   const [slippage, setSlippage] = useState(100);
   const [prepared, setPrepared] = useState<PreparedSwap>();
   const [quoting, setQuoting] = useState(false);
-  const [result, setResult] = useState<SwapFlowResult>();
+  const [result, setResult] = useState<ShownResult>();
   const [error, setError] = useState<string>();
+  const [note, setNote] = useState<string>();
 
   const holdings = portfolio.holdings.filter((h) => h.balance > BigInt(0));
   const tokenIn = holdings.find((h) => h.address === (inAddr || holdings[0]?.address));
@@ -64,7 +67,7 @@ export function SwapCard({ portfolio, disabled, onDone }: { portfolio: Portfolio
     );
   }
 
-  const reset = () => { setPrepared(undefined); setResult(undefined); setError(undefined); };
+  const reset = () => { setPrepared(undefined); setResult(undefined); setError(undefined); setNote(undefined); };
 
   async function doQuote() {
     reset();
@@ -81,11 +84,28 @@ export function SwapCard({ portfolio, disabled, onDone }: { portfolio: Portfolio
   async function doSwap() {
     setError(undefined);
     setResult(undefined);
+    setNote(undefined);
     try {
       // Re-quote right before sending so minOut is fresh, then execute exactly what was quoted.
-      const fresh = await prepare({ route: route!, tokenIn: tokenIn!, tokenOut: tokenOut!, amountIn: parsed!, slippageBps: slippage });
-      setPrepared(fresh);
-      setResult(await execute(fresh));
+      const input = { route: route!, tokenIn: tokenIn!, tokenOut: tokenOut!, amountIn: parsed!, slippageBps: slippage };
+      let fresh = await prepare(input);
+      const excluded: string[] = [];
+      for (;;) {
+        setPrepared(fresh);
+        try {
+          // Snapshot the tokens: after the swap the holdings change, so the live selection may no longer match what was traded.
+          setResult({ ...(await execute(fresh)), shownIn: tokenIn!, shownOut: tokenOut! });
+          break;
+        } catch (err) {
+          // The pre-send simulation reverted (nothing signed). A ParaSwap route can depend on a liquidity source that does not
+          // work at this chain state (typically market makers on a stale fork): re-quote without it, at most twice.
+          const next = (fresh.exchanges ?? []).filter((e) => !excluded.includes(e));
+          if (!(err instanceof SwapSimulationError) || route!.kind !== "paraSwapV6" || next.length === 0 || excluded.length >= 2) throw err;
+          excluded.push(...next);
+          setNote(`ParaSwap route via ${next.join(", ")} reverted in simulation; re-quoted without it.`);
+          fresh = await prepare({ ...input, excludeDexes: excluded });
+        }
+      }
       setAmount("");
       await onDone();
     } catch (err) {
@@ -145,8 +165,9 @@ export function SwapCard({ portfolio, disabled, onDone }: { portfolio: Portfolio
           {formatAmount(prepared.expectedOut, tokenOut.decimals)} {tokenOut.symbol} (min {formatAmount(prepared.minOut, tokenOut.decimals)}) · {prepared.description}
         </p>
       )}
+      {note && <Notice kind="info"><span data-testid="swap-reroute-note">{note}</span></Notice>}
       {error && <Notice kind="error">{error}</Notice>}
-      {result && tokenOut && tokenIn && (
+      {result && (
         <Notice kind="ok">
           <div data-testid="swap-result">
             <strong>Swap executed.</strong>{" "}
@@ -154,10 +175,10 @@ export function SwapCard({ portfolio, disabled, onDone }: { portfolio: Portfolio
             <code data-testid="swap-result-adapter">{result.adapter}</code>
             <ul>
               <li data-testid="swap-result-spent">
-                Sold {result.spentAssets.map((a, i) => `${formatAmount(result.spentAmounts[i], tokenIn.decimals)} ${a.toLowerCase() === tokenIn.address.toLowerCase() ? tokenIn.symbol : shortAddress(a)}`).join(", ")}
+                Sold {result.spentAssets.map((a, i) => `${formatAmount(result.spentAmounts[i], result.shownIn.decimals)} ${a.toLowerCase() === result.shownIn.address.toLowerCase() ? result.shownIn.symbol : shortAddress(a)}`).join(", ")}
               </li>
               <li data-testid="swap-result-received">
-                Received {result.incomingAssets.map((a, i) => `${formatAmount(result.incomingAmounts[i], tokenOut.decimals)} ${a.toLowerCase() === tokenOut.address.toLowerCase() ? tokenOut.symbol : shortAddress(a)}`).join(", ")}
+                Received {result.incomingAssets.map((a, i) => `${formatAmount(result.incomingAmounts[i], result.shownOut.decimals)} ${a.toLowerCase() === result.shownOut.address.toLowerCase() ? result.shownOut.symbol : shortAddress(a)}`).join(", ")}
               </li>
             </ul>
             {explorerUrl(chainId, `/tx/${result.txHash}`) && <a href={explorerUrl(chainId, `/tx/${result.txHash}`)} target="_blank" rel="noreferrer">View transaction</a>}
