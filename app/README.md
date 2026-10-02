@@ -36,7 +36,8 @@ Scripts: `npm run lint`, `npm run typecheck`, `npm test` (vitest), `npm run buil
   `arb1.arbitrum.io/rpc`) that are rate-limited; use a dedicated provider in production. Unset or empty means
   "use the default". Resolution lives in `src/config/rpc.ts` and feeds both the chain definitions and the wagmi
   transports. See `.env.example`.
-- `NEXT_PUBLIC_FUND_DEPLOYER_{ETHEREUM,BASE,ARBITRUM,ROBINHOOD}`: FundDeployer address per chain.
+- Deployment addresses: see [Deployment addresses](#deployment-addresses) below (`deployments/<chain>.json` records +
+  `NEXT_PUBLIC_FUND_DEPLOYER_<CHAIN>` and related overrides, `NEXT_PUBLIC_USE_FORK_DEPLOYMENTS`).
 
 Everything `NEXT_PUBLIC_*` is shipped to the browser. Never put secrets in them.
 
@@ -119,6 +120,53 @@ Tests: `npm test` runs `src/e2e/mockWallet.test.ts`, which starts four local Anv
 4663), connects the connector, switches across all four chains and sends a transaction on each. It is skipped if `anvil` is
 not installed (install [Foundry](https://book.getfoundry.sh/); CI does). Other checks: `npm run check:e2e-guard` (the
 build guard) and `npm run verify:bundle -- absent|present` (scan `.next`).
+
+## Deployment addresses
+
+No contract address is hardcoded in the app. Per chain, `src/lib/deployments` resolves a typed `ChainDeployment` from:
+
+1. **`deployments/<chain>.json`** in the repo root (`ethereum|base|arbitrum|robinhood`; written by `script/DeployCore.s.sol`
+   on branch `feat/deploy-scripts`, PR #3). They are read by `next.config.mjs` **at build time** and inlined; the directory can be
+   changed with the build-time-only `DEPLOYMENTS_DIR`. Missing directory = no records. (On Vercel, Root Directory = `app`
+   must allow source files outside the root, which is Vercel's default.)
+2. **Env overrides** (always win, no flag needed): `NEXT_PUBLIC_FUND_DEPLOYER_<CHAIN>` plus optional
+   `NEXT_PUBLIC_VALUE_INTERPRETER_<CHAIN>`, `..._FUND_VALUE_CALCULATOR_ROUTER_<CHAIN>`, `..._DEPLOY_BLOCK_<CHAIN>`,
+   `..._DENOMINATION_ASSETS_<CHAIN>` (`USDC:0x..,USDG:0x..`), `..._UNISWAP_V3_ADAPTER_<CHAIN>`,
+   `..._UNISWAP_V3_SWAPROUTER02_ADAPTER_<CHAIN>`, `..._UNISWAP_V3_QUOTER_<CHAIN>`. If the FundDeployer override differs from the
+   record's `fundDeployer`, the record is **superseded** for that chain (its other addresses are not mixed in); the app
+   then discovers the rest on-chain (ValueInterpreter and IntegrationManager from the vault's ComptrollerLib).
+
+**Fork records are not used by default.** A record is "mainnet" only if it says `"mainnet": true`, `"kind": "mainnet broadcast"`,
+`"runKind": "broadcast"` and carries no fork marker (`forkBlock > 0`, a "fork" label...). Records with `"mainnet": false` /
+`"kind": "fork, not mainnet"`, and **unlabelled** ones (e.g. early QA records that say `REAL BROADCAST DEPLOYMENT` but were
+broadcast to a local fork) are dropped at build time unless `NEXT_PUBLIC_USE_FORK_DEPLOYMENTS=1` (or `true`). Without the flag the
+fork addresses are not in the bundle at all (CI proves it with `npm run verify:fork-bundle`), and the chain shows
+**"Protocol not deployed on <chain>"**. With the flag, a "FORK DEPLOYMENT RECORDS" banner is shown on every page.
+
+Like the mock wallet, the flag is guarded: `npm run build` **fails** if it is `1`/`true` while `VERCEL_ENV=production` or
+`VERCEL_TARGET_ENV=production`, or if it has any value other than `1|true|0|false|unset` (`scripts/fork-deployments-guard.mjs`,
+run by `prebuild` and again from `next.config.mjs`; tested in `scripts/fork-deployments-guard.test.ts`). Setting
+`NEXT_PUBLIC_FUND_DEPLOYER_<CHAIN>` is a separate explicit opt-in and is not blocked.
+
+Record fields used: `addresses.*`, `denominationAsset` (and an optional `denominationAssets` list), `forkBlock`,
+`blockNumberAtDeploy`, optional `deployBlock`, and the optional sections described below. Proposed (not yet written by
+`DeployCore`) fields, all handled when absent:
+
+```jsonc
+{
+  "deployBlock": 123456789,                       // chain-native block of the FundDeployer deployment (see note)
+  "denominationAssets": [{ "symbol": "USDC", "address": "0x..." }],  // else [denominationAsset]
+  "adapters": {                                   // swap UI only appears when the chain-eligible adapter is present
+    "uniswapV3Adapter": "0x...",                  // Ethereum, Arbitrum (original SwapRouter)
+    "uniswapV3SwapRouter02Adapter": "0x..."       // Base only (PR #4 adapter)
+  },
+  "externalContracts": { "uniswapV3QuoterV2": "0x..." }   // else the official QuoterV2 for the chain
+}
+```
+
+`blockNumberAtDeploy` is Solidity's `block.number`, which on Arbitrum One and Robinhood Chain (Arbitrum Orbit) is the **L1**
+number, so it is never used as a log-scan start there. Fork records use `forkBlock` (chain-native); real records need
+`deployBlock` on those chains, else scans use a bounded look-back.
 
 ## Layout
 

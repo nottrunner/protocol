@@ -46,8 +46,8 @@ export function CreatePortfolioForm() {
       {isSupported && !enabled && <Notice kind="warn">Portfolio creation is not enabled on {chain?.name}.</Notice>}
       {isSupported && enabled && !deployer && (
         <Notice kind="warn">
-          Protocol not deployed on {chain?.name} yet (FundDeployer address not configured). The form is
-          functional once <code>app/src/lib/contracts/addresses.ts</code> or the env var is set.
+          Protocol not deployed on {chain?.name}. No deployment record (<code>deployments/{chain?.name?.toLowerCase().split(" ")[0]}.json</code>)
+          is bundled and <code>NEXT_PUBLIC_FUND_DEPLOYER_*</code> is not set for this chain.
         </Notice>
       )}
 

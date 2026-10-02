@@ -1,0 +1,185 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { parseDenominationAssetsEnv, parseInlinedRecords, resolveChainDeployment, resolveSwapAdapter } from "./loader";
+
+const FIX = join(__dirname, "__fixtures__");
+const read = (p: string) => JSON.parse(readFileSync(join(FIX, p), "utf8")) as Record<string, unknown>;
+const CHAINS = { ethereum: 1, base: 8453, arbitrum: 42161, robinhood: 4663 } as const;
+const forkRecords = Object.fromEntries(Object.entries(CHAINS).map(([n, id]) => [String(id), read(`fork-samples/${n}.json`)]));
+const mainnetLike = (chain: keyof typeof CHAINS, extra: Record<string, unknown> = {}) => ({
+  ...read(`fork-samples/${chain}.json`),
+  kind: "mainnet broadcast", mainnet: true, runKind: "broadcast", forkBlock: 0, label: "REAL BROADCAST DEPLOYMENT", ...extra,
+});
+const A1 = "0x1111111111111111111111111111111111111111";
+const A2 = "0x2222222222222222222222222222222222222222";
+const A3 = "0x3333333333333333333333333333333333333333";
+
+describe("fork-samples shapes", () => {
+  it("fork records are IGNORED by default (useFork=false): chain shows as not deployed", () => {
+    for (const id of Object.values(CHAINS)) {
+      const d = resolveChainDeployment(id, { records: forkRecords, useFork: false, env: {} });
+      expect(d.fundDeployer).toBeNull();
+      expect(d.origin).toBe("none");
+      expect(d.notes.join(" ")).toMatch(/fork deployment record ignored/);
+    }
+  });
+
+  it("with useFork=true the fork-sample addresses, denomination asset and fork flag load for all four chains", () => {
+    for (const [name, id] of Object.entries(CHAINS)) {
+      const raw = forkRecords[String(id)] as { addresses: Record<string, string>; denominationAsset: { symbol: string; address: string } };
+      const d = resolveChainDeployment(id, { records: forkRecords, useFork: true, env: {} });
+      expect(d.origin).toBe("record");
+      expect(d.isFork).toBe(true);
+      expect(d.recordSource).toBe("fork");
+      expect(d.fundDeployer?.toLowerCase()).toBe(raw.addresses.fundDeployer?.toLowerCase());
+      expect(d.addresses.valueInterpreter?.toLowerCase()).toBe(raw.addresses.valueInterpreter?.toLowerCase());
+      expect(d.addresses.fundValueCalculatorRouter).toBeDefined();
+      expect(d.denominationSource).toBe("record");
+      expect(d.denominationAssets).toHaveLength(1);
+      expect(d.denominationAssets[0]?.symbol).toBe(name === "robinhood" ? "USDG" : "USDC");
+      expect(d.denominationAssets[0]?.address.toLowerCase()).toBe(raw.denominationAsset.address.toLowerCase());
+    }
+  });
+
+  it("Robinhood: USDG denomination, swaps off even if an adapter is present", () => {
+    const rec = { ...forkRecords["4663"] as object, adapters: { uniswapV3Adapter: A1, uniswapV3SwapRouter02Adapter: A2 } };
+    const d = resolveChainDeployment(4663, { records: { "4663": rec }, useFork: true, env: {} });
+    expect(d.denominationAssets[0]?.address).toBe("0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168");
+    expect(d.swapAdapter).toBeNull();
+  });
+
+  it("fromBlock: fork records use forkBlock (NOT blockNumberAtDeploy, which is an L1 number on Orbit chains)", () => {
+    const arb = resolveChainDeployment(42161, { records: forkRecords, useFork: true, env: {} });
+    expect(arb.fromBlock).toBe(BigInt(510942849));
+    expect(arb.fromBlockSource).toBe("forkBlock");
+    const eth = resolveChainDeployment(1, { records: forkRecords, useFork: true, env: {} });
+    expect(eth.fromBlock).toBe(BigInt(26103729));
+  });
+
+  it("legacy QA record (REAL BROADCAST label, no kind/mainnet) is ignored by default, loads (as fork) with the flag, falls back to token list", () => {
+    const records = { "1": read("legacy/ethereum.json") };
+    expect(resolveChainDeployment(1, { records, useFork: false, env: {} }).fundDeployer).toBeNull();
+    const d = resolveChainDeployment(1, { records, useFork: true, env: {} });
+    expect(d.isFork).toBe(true);
+    expect(d.fundDeployer).toBe("0xd1D84F3bb531f12ab5B348fD8DFCFf1B07FB3446");
+    expect(d.denominationSource).toBe("fallback");
+    expect(d.denominationAssets.map((a) => a.symbol)).toEqual(["USDC"]);
+    expect(d.fromBlock).toBe(BigInt(26103732));
+  });
+});
+
+describe("mainnet-labelled records", () => {
+  it("are used without any flag, are not flagged as fork", () => {
+    const d = resolveChainDeployment(1, { records: { "1": mainnetLike("ethereum") }, useFork: false, env: {} });
+    expect(d.origin).toBe("record");
+    expect(d.isFork).toBe(false);
+    expect(d.recordSource).toBe("mainnet");
+    expect(d.fromBlock).toBe(BigInt(26103730));
+    expect(d.fromBlockSource).toBe("blockNumberAtDeploy");
+  });
+  it("Orbit chains: blockNumberAtDeploy is not trusted; explicit deployBlock is", () => {
+    const base = mainnetLike("arbitrum");
+    const noBlock = resolveChainDeployment(42161, { records: { "42161": base }, useFork: false, env: {} });
+    expect(noBlock.fromBlock).toBeNull();
+    expect(noBlock.notes.join(" ")).toMatch(/Orbit/);
+    const withBlock = resolveChainDeployment(42161, { records: { "42161": { ...base, deployBlock: 400000000 } }, useFork: false, env: {} });
+    expect(withBlock.fromBlock).toBe(BigInt(400000000));
+    expect(withBlock.fromBlockSource).toBe("deployBlock");
+  });
+  it("a mainnet-looking record that is secretly fork-flagged (inconsistent) is treated as fork", () => {
+    const rec = mainnetLike("ethereum", { forkBlock: 12 });
+    expect(resolveChainDeployment(1, { records: { "1": rec }, useFork: false, env: {} }).fundDeployer).toBeNull();
+  });
+  it("rejects a record for another chain", () => {
+    const rec = mainnetLike("base");
+    expect(resolveChainDeployment(1, { records: { "1": rec }, useFork: true, env: {} }).fundDeployer).toBeNull();
+  });
+});
+
+describe("env overrides", () => {
+  it("work with no record at all (explicit opt-in, no flag needed) and are labelled env, not fork", () => {
+    const d = resolveChainDeployment(1, { records: {}, useFork: false, env: { 1: { fundDeployer: A1 } } });
+    expect(d.fundDeployer).toBe(A1);
+    expect(d.origin).toBe("env");
+    expect(d.isFork).toBe(false);
+    expect(d.denominationAssets.map((a) => a.symbol)).toEqual(["USDC"]);
+    expect(d.denominationSource).toBe("fallback");
+  });
+  it("win over a record: a different FundDeployer supersedes the record entirely (no address mixing)", () => {
+    const d = resolveChainDeployment(1, { records: forkRecords, useFork: true, env: { 1: { fundDeployer: A1 } } });
+    expect(d.fundDeployer).toBe(A1);
+    expect(d.origin).toBe("env");
+    expect(d.addresses.valueInterpreter).toBeUndefined();
+    expect(d.fromBlock).toBeNull();
+    expect(d.notes.join(" ")).toMatch(/superseded/);
+  });
+  it("same FundDeployer as the record overlays the other env values on the record", () => {
+    const fd = (forkRecords["1"] as { addresses: { fundDeployer: string } }).addresses.fundDeployer;
+    const d = resolveChainDeployment(1, {
+      records: forkRecords, useFork: true,
+      env: { 1: { fundDeployer: fd.toLowerCase(), valueInterpreter: A2, deployBlock: "123" } },
+    });
+    expect(d.origin).toBe("record");
+    expect(d.addresses.valueInterpreter).toBe(A2);
+    expect(d.fromBlock).toBe(BigInt(123));
+    expect(d.fromBlockSource).toBe("env");
+    expect(d.addresses.comptrollerLib).toBeDefined();
+  });
+  it("env FundDeployer works even when the fork record is dropped (useFork=false)", () => {
+    const d = resolveChainDeployment(8453, { records: {}, useFork: false, env: { 8453: { fundDeployer: A3 } } });
+    expect(d.fundDeployer).toBe(A3);
+  });
+  it("blank / invalid values are ignored with a note", () => {
+    const d = resolveChainDeployment(1, { records: {}, useFork: false, env: { 1: { fundDeployer: "  ", valueInterpreter: "nope" } } });
+    expect(d.fundDeployer).toBeNull();
+    const d2 = resolveChainDeployment(1, { records: {}, useFork: false, env: { 1: { fundDeployer: "0x123" } } });
+    expect(d2.fundDeployer).toBeNull();
+    expect(d2.notes.join(" ")).toMatch(/not a valid address/);
+  });
+  it("NEXT_PUBLIC_DENOMINATION_ASSETS_* replaces the list", () => {
+    const d = resolveChainDeployment(1, { records: {}, useFork: false, env: { 1: { fundDeployer: A1, denominationAssets: `DAI:${A2}, ${A3}` } } });
+    expect(d.denominationSource).toBe("env");
+    expect(d.denominationAssets.map((a) => a.symbol)).toEqual(["DAI", "0x3333…3333"]);
+  });
+  it("parseDenominationAssetsEnv reports bad entries", () => {
+    const r = parseDenominationAssetsEnv(`USDC:${A1},bad,X:0x12`);
+    expect(r.assets).toHaveLength(1);
+    expect(r.bad).toEqual(["bad", "X:0x12"]);
+  });
+});
+
+describe("swap adapter eligibility", () => {
+  it("Ethereum and Arbitrum use uniswapV3 only; Base only the SwapRouter02 adapter; Robinhood never", () => {
+    const both = { uniswapV3: A1 as `0x${string}`, uniswapV3SwapRouter02: A2 as `0x${string}` };
+    expect(resolveSwapAdapter(1, both, null)?.kind).toBe("uniswapV3");
+    expect(resolveSwapAdapter(42161, both, null)?.address).toBe(A1);
+    expect(resolveSwapAdapter(8453, both, null)).toMatchObject({ kind: "uniswapV3SwapRouter02", address: A2 });
+    expect(resolveSwapAdapter(8453, { uniswapV3: A1 as `0x${string}` }, null)).toBeNull();
+    expect(resolveSwapAdapter(1, { uniswapV3SwapRouter02: A2 as `0x${string}` }, null)).toBeNull();
+    expect(resolveSwapAdapter(4663, both, null)).toBeNull();
+    expect(resolveSwapAdapter(999, both, null)).toBeNull();
+  });
+  it("adapters section absent => no swap adapter (UI shows 'Swaps not enabled on this chain')", () => {
+    expect(resolveChainDeployment(1, { records: forkRecords, useFork: true, env: {} }).swapAdapter).toBeNull();
+  });
+  it("adapters come from the record (string or {address}) or env, with the official QuoterV2 default", () => {
+    const rec = { ...forkRecords["1"] as object, adapters: { uniswapV3Adapter: { address: A1 } } };
+    const d = resolveChainDeployment(1, { records: { "1": rec }, useFork: true, env: {} });
+    expect(d.swapAdapter).toEqual({ kind: "uniswapV3", address: A1, quoter: "0x61fFE014bA17989E743c5F6cB21bF9697530B21e" });
+    const b = resolveChainDeployment(8453, { records: {}, useFork: false, env: { 8453: { fundDeployer: A1, uniswapV3SwapRouter02Adapter: A2, uniswapV3Quoter: A3 } } });
+    expect(b.swapAdapter).toEqual({ kind: "uniswapV3SwapRouter02", address: A2, quoter: A3 });
+    const b2 = resolveChainDeployment(8453, { records: {}, useFork: false, env: { 8453: { fundDeployer: A1, uniswapV3Adapter: A2 } } });
+    expect(b2.swapAdapter).toBeNull();
+  });
+});
+
+describe("parseInlinedRecords", () => {
+  it("never throws", () => {
+    expect(parseInlinedRecords(undefined)).toEqual({});
+    expect(parseInlinedRecords("")).toEqual({});
+    expect(parseInlinedRecords("{bad")).toEqual({});
+    expect(parseInlinedRecords("[1]")).toEqual({});
+    expect(parseInlinedRecords('{"1":{"a":1}}')).toEqual({ "1": { a: 1 } });
+  });
+});

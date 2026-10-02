@@ -5,10 +5,12 @@
   "engines": { "node": ">=20" },
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node scripts/check-e2e-mock-guard.mjs",
+    "prebuild": "node scripts/check-e2e-mock-guard.mjs && node scripts/check-fork-deployments-guard.mjs",
     "build": "next build",
     "check:e2e-guard": "node scripts/check-e2e-mock-guard.mjs",
+    "check:fork-guard": "node scripts/check-fork-deployments-guard.mjs",
     "verify:bundle": "node scripts/verify-e2e-mock-bundle.mjs",
+    "verify:fork-bundle": "node scripts/verify-fork-deployments-bundle.mjs",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

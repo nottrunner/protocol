@@ -5,7 +5,8 @@ import { isAddress, parseEventLogs, type Address, type Hash } from "viem";
 import { useAccount, usePublicClient, useReadContract, useReadContracts, useWriteContract } from "wagmi";
 import { isFeatureEnabled } from "@/config/features";
 import { comptrollerAbi, erc20Abi, fundDeployerAbi, vaultAbi } from "./abis";
-import { getFundDeployer } from "./addresses";
+import { supportedChainIds } from "@/config/chains";
+import { getChainDeployment, getFundDeployer } from "./addresses";
 
 /** Public API of the contracts layer. UI code must only use what `@/lib/contracts` re-exports. */
 
@@ -200,4 +201,14 @@ export async function listPortfolios(chainId: number, account: Address): Promise
   void chainId;
   void account;
   return [];
+}
+
+/** Resolved deployment (record + env overrides) for a chain. Static for the lifetime of the build. */
+export function useDeployment(chainId: number) {
+  return getChainDeployment(chainId);
+}
+
+/** True if any supported chain's addresses come from a fork / unlabelled record (QA builds only). */
+export function anyForkDeployment(): boolean {
+  return supportedChainIds.some((id) => getChainDeployment(id).isFork);
 }
