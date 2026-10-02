@@ -50,4 +50,15 @@ export const envOverridesByChain: Record<number, ChainEnvOverrides> = {
     uniswapV3Quoter: process.env.NEXT_PUBLIC_UNISWAP_V3_QUOTER_ROBINHOOD,
     paraSwapV6Adapter: process.env.NEXT_PUBLIC_PARASWAP_V6_ADAPTER_ROBINHOOD,
   },
+  999: {
+    fundDeployer: process.env.NEXT_PUBLIC_FUND_DEPLOYER_HYPEREVM,
+    valueInterpreter: process.env.NEXT_PUBLIC_VALUE_INTERPRETER_HYPEREVM,
+    fundValueCalculatorRouter: process.env.NEXT_PUBLIC_FUND_VALUE_CALCULATOR_ROUTER_HYPEREVM,
+    deployBlock: process.env.NEXT_PUBLIC_DEPLOY_BLOCK_HYPEREVM,
+    denominationAssets: process.env.NEXT_PUBLIC_DENOMINATION_ASSETS_HYPEREVM,
+    uniswapV3Adapter: process.env.NEXT_PUBLIC_UNISWAP_V3_ADAPTER_HYPEREVM,
+    uniswapV3SwapRouter02Adapter: process.env.NEXT_PUBLIC_UNISWAP_V3_SWAPROUTER02_ADAPTER_HYPEREVM,
+    uniswapV3Quoter: process.env.NEXT_PUBLIC_UNISWAP_V3_QUOTER_HYPEREVM,
+    paraSwapV6Adapter: process.env.NEXT_PUBLIC_PARASWAP_V6_ADAPTER_HYPEREVM,
+  },
 };

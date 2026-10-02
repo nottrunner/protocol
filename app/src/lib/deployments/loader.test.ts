@@ -241,3 +241,21 @@ describe("parseInlinedRecords", () => {
     expect(parseInlinedRecords('{"1":{"a":1}}')).toEqual({ "1": { a: 1 } });
   });
 });
+
+describe("HyperEVM (chain id 999)", () => {
+  const hyper = { ...read("fork-samples/robinhood.json"), chain: "hyperliquid", chainId: 999, forkBlock: 47464264 };
+  it("fork record is ignored by default and loads with the fork flag; swaps stay off; non-Orbit block numbers are chain-native", () => {
+    expect(resolveChainDeployment(999, { records: { "999": hyper }, useFork: false, env: {} }).fundDeployer).toBeNull();
+    const d = resolveChainDeployment(999, { records: { "999": hyper }, useFork: true, env: {} });
+    expect(d.origin).toBe("record");
+    expect(d.isFork).toBe(true);
+    expect(d.swapAdapters).toEqual([]);
+    expect(d.fromBlock).toBe(BigInt(47464264));
+  });
+  it("has its own NEXT_PUBLIC_*_HYPEREVM override slot", async () => {
+    const { envOverridesByChain } = await import("./env");
+    expect(envOverridesByChain[999]).toBeDefined();
+    const d = resolveChainDeployment(999, { records: {}, useFork: false, env: { 999: { fundDeployer: A1 } } });
+    expect(d.fundDeployer).toBe(A1);
+  });
+});

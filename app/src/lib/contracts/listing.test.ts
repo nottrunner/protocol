@@ -74,6 +74,10 @@ describe("scanStartBlock", () => {
     expect(scanStartBlock(1, B(100), B(1000))).toEqual({ from: B(100), bounded: false });
     expect(scanStartBlock(1, B(5000), B(1000))).toEqual({ from: B(1000), bounded: false });
   });
+  it("has a bounded look-back for every supported chain including HyperEVM (999)", () => {
+    for (const id of [1, 8453, 42161, 4663, 999]) expect(scanStartBlock(id, null, B(100_000_000)).bounded).toBe(true);
+    expect(scanStartBlock(999, null, B(100_000_000)).from).toBe(B(95_000_000));
+  });
   it("falls back to a bounded per-chain look-back", () => {
     const r = scanStartBlock(1, null, B(1_000_000));
     expect(r.bounded).toBe(true);

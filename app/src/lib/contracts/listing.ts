@@ -83,6 +83,7 @@ export const DEFAULT_LOOKBACK_BLOCKS: Record<number, bigint> = {
   8453: BigInt(2_500_000),
   42161: BigInt(40_000_000),
   4663: BigInt(40_000_000),
+  999: BigInt(5_000_000), // HyperEVM: ~1 s blocks
 };
 
 export function scanStartBlock(chainId: number, fromBlock: bigint | null, latest: bigint): { from: bigint; bounded: boolean } {

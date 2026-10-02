@@ -125,14 +125,14 @@ build guard) and `npm run verify:bundle -- absent|present` (scan `.next`).
 
 No contract address is hardcoded in the app. Per chain, `src/lib/deployments` resolves a typed `ChainDeployment` from:
 
-1. **`deployments/<chain>.json`** in the repo root (`ethereum|base|arbitrum|robinhood`; written by `script/DeployCore.s.sol`
+1. **`deployments/<chain>.json`** in the repo root (`ethereum|base|arbitrum|robinhood`, and `hyperliquid` for HyperEVM, chain id 999; written by `script/DeployCore.s.sol`
    on branch `feat/deploy-scripts`, PR #3). They are read by `next.config.mjs` **at build time** and inlined; the directory can be
    changed with the build-time-only `DEPLOYMENTS_DIR`. Missing directory = no records. (On Vercel, Root Directory = `app`
    must allow source files outside the root, which is Vercel's default.)
 2. **Env overrides** (always win, no flag needed): `NEXT_PUBLIC_FUND_DEPLOYER_<CHAIN>` plus optional
    `NEXT_PUBLIC_VALUE_INTERPRETER_<CHAIN>`, `..._FUND_VALUE_CALCULATOR_ROUTER_<CHAIN>`, `..._DEPLOY_BLOCK_<CHAIN>`,
    `..._DENOMINATION_ASSETS_<CHAIN>` (`USDC:0x..,USDG:0x..`), `..._UNISWAP_V3_ADAPTER_<CHAIN>`,
-   `..._UNISWAP_V3_SWAPROUTER02_ADAPTER_<CHAIN>`, `..._PARASWAP_V6_ADAPTER_<CHAIN>`, `..._UNISWAP_V3_QUOTER_<CHAIN>`. If the FundDeployer override differs from the
+   `..._UNISWAP_V3_SWAPROUTER02_ADAPTER_<CHAIN>`, `..._PARASWAP_V6_ADAPTER_<CHAIN>` (`<CHAIN>` also accepts `HYPEREVM`), `..._UNISWAP_V3_QUOTER_<CHAIN>`. If the FundDeployer override differs from the
    record's `fundDeployer`, the record is **superseded** for that chain (its other addresses are not mixed in); the app
    then discovers the rest on-chain (ValueInterpreter and IntegrationManager from the vault's ComptrollerLib).
 

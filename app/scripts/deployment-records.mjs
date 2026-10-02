@@ -3,7 +3,7 @@
 // (src/lib/deployments). It decides which records may be embedded in the bundle. No Node imports here (browser-safe);
 // directory reading lives in load-deployment-records.mjs.
 /** Chains the app knows, by deployments/<name>.json file name. */
-export const CHAIN_IDS_BY_NAME = { ethereum: 1, base: 8453, arbitrum: 42161, robinhood: 4663 };
+export const CHAIN_IDS_BY_NAME = { ethereum: 1, base: 8453, arbitrum: 42161, robinhood: 4663, hyperliquid: 999 }; // HyperEVM's record is deployments/hyperliquid.json (chain "hyperliquid", chainId 999)
 
 /**
  * Where a record comes from:

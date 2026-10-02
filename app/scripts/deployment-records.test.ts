@@ -52,6 +52,13 @@ describe("selectRecords", () => {
     expect(r.records["1"]).not.toHaveProperty("deployer");
     expect(r.records["1"]).toHaveProperty("addresses");
   });
+  it("HyperEVM: deployments/hyperliquid.json (chain \"hyperliquid\", id 999) is recognised, fork-gated like the others", () => {
+    const raw = { ...read("fork-samples/robinhood.json"), chain: "hyperliquid", chainId: 999 };
+    const f = [{ file: "hyperliquid.json", raw }];
+    expect(Object.keys(selectRecords(f, { useFork: false }).records)).toEqual([]);
+    expect(Object.keys(selectRecords(f, { useFork: true }).records)).toEqual(["999"]);
+    expect(selectRecords([{ file: "hyperliquid.json", raw: { ...raw, chainId: 998 } }], { useFork: true }).records).toEqual({});
+  });
   it("keeps mainnet-labelled records regardless of the flag", () => {
     const r = selectRecords([{ file: "base.json", raw: mainnetLike("base", 8453) }], { useFork: false });
     expect(Object.keys(r.records)).toEqual(["8453"]);
