@@ -10,7 +10,7 @@ p_: struct DeployCore.Persistent Persistent({ dispatcher: 0x8198f5d8F8CfFE8f9C41
 r_: struct DeployCore.Release Release({ gasRelayPaymasterFactory: 0x46b142DD1E924FAb83eCc3c08e4D46E82f005e0E, fundDeployer: 0xC9a43158891282A2B1475592D5719c001986Aaec, protocolFeeTracker: 0x1c85638e118b37167e9298c2268758e058DdfDA0, valueInterpreter: 0x367761085BF3C12e5DA2Df99AC6E1a824612b8fb, policyManager: 0x4C2F7092C2aE51D986bEFEe378e50BD4dB99C901, externalPositionManager: 0x7A9Ec1d04904907De0ED7b6839CcdD59c3716AC9, feeManager: 0x49fd2BE640DB2910c2fAb69bB8531Ab6E76127ff, integrationManager: 0x4631BCAbD6dF18D94796344963cB60d44a4136b6, comptrollerLib: 0x86A2EE8FAf9A840F7a2c64CA3d51209F9A02081D, vaultLib: 0xA4899D35897033b927acFCf422bc745916139776, fundValueCalculator: 0xf953b3A269d80e3eB0F2947630Da976B896A8C5b })
 
 == Logs ==
-  1 WETH in first primitive (raw units): 90785014
+  1 WETH in first primitive (raw units): 89103564
   == DeployCore: hyperliquid chainid 999
   dispatcher 0x8198f5d8F8CfFE8f9C413d98a0A55aEB8ab9FbB7
   addressListRegistry 0x0355B7B8cb128fA5692729Ab3AAa199C1753f726
@@ -30,6 +30,9 @@ r_: struct DeployCore.Release Release({ gasRelayPaymasterFactory: 0x46b142DD1E92
   comptrollerLib 0x86A2EE8FAf9A840F7a2c64CA3d51209F9A02081D
   vaultLib 0xA4899D35897033b927acFCf422bc745916139776
   fundValueCalculator 0xf953b3A269d80e3eB0F2947630Da976B896A8C5b
+  uniswapV3Adapter 0x0000000000000000000000000000000000000000
+  uniswapV3SwapRouter02Adapter 0x0000000000000000000000000000000000000000
+  paraSwapV6Adapter 0x0000000000000000000000000000000000000000
   wrote deployments/hyperliquid.json
 
 ## Setting up 1 EVM.
@@ -38,13 +41,13 @@ r_: struct DeployCore.Release Release({ gasRelayPaymasterFactory: 0x46b142DD1E92
 
 Chain 999
 
-Estimated max fee per gas: 0.240639602 gwei
-Estimated base fee per gas: 0.0879448 gwei
-Estimated max priority fee per gas: 0.064750002 gwei
+Estimated max fee per gas: 0.204271972 gwei
+Estimated base fee per gas: 0.099635986 gwei
+Estimated max priority fee per gas: 0.005 gwei
 
 Estimated total gas used for script: 48558704
 
-Estimated amount required: 0.011685147204195808 HYPE
+Estimated amount required: 0.009919182223844288 HYPE
 
 ==========================
 
