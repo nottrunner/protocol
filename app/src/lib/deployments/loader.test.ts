@@ -51,10 +51,10 @@ describe("fork-samples shapes", () => {
 
   it("fromBlock: fork records use forkBlock (NOT blockNumberAtDeploy, which is an L1 number on Orbit chains)", () => {
     const arb = resolveChainDeployment(42161, { records: forkRecords, useFork: true, env: {} });
-    expect(arb.fromBlock).toBe(BigInt(510942849));
+    expect(arb.fromBlock).toBe(BigInt(510944642));
     expect(arb.fromBlockSource).toBe("forkBlock");
     const eth = resolveChainDeployment(1, { records: forkRecords, useFork: true, env: {} });
-    expect(eth.fromBlock).toBe(BigInt(26103729));
+    expect(eth.fromBlock).toBe(BigInt(26103767));
   });
 
   it("legacy QA record (REAL BROADCAST label, no kind/mainnet) is ignored by default, loads (as fork) with the flag, falls back to token list", () => {
@@ -69,17 +69,55 @@ describe("fork-samples shapes", () => {
   });
 });
 
+describe("fork-samples with adapters (shape of the register-adapters deploy step)", () => {
+  const withAdapters = Object.fromEntries(
+    Object.entries(CHAINS).map(([n, id]) => [String(id), read(`fork-samples-adapters/${n}.json`)]),
+  );
+  const load = (id: number) => resolveChainDeployment(id, { records: withAdapters, useFork: true, env: {} });
+  it("Ethereum + Arbitrum: swap uses addresses.uniswapV3Adapter and the official QuoterV2", () => {
+    for (const id of [1, 42161]) {
+      const d = load(id);
+      const raw = withAdapters[String(id)] as { addresses: Record<string, string> };
+      expect(d.swapAdapter?.kind).toBe("uniswapV3");
+      expect(d.swapAdapter?.address.toLowerCase()).toBe(raw.addresses.uniswapV3Adapter?.toLowerCase());
+      expect(d.swapAdapter?.quoter).toBe("0x61fFE014bA17989E743c5F6cB21bF9697530B21e");
+    }
+  });
+  it("Base: swap uses ONLY uniswapV3SwapRouter02Adapter (paraswap is not a UI swap adapter)", () => {
+    const d = load(8453);
+    const raw = withAdapters["8453"] as { addresses: Record<string, string> };
+    expect(d.swapAdapter?.kind).toBe("uniswapV3SwapRouter02");
+    expect(d.swapAdapter?.address.toLowerCase()).toBe(raw.addresses.uniswapV3SwapRouter02Adapter?.toLowerCase());
+    expect(d.swapAdapter?.quoter).toBe("0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a");
+  });
+  it("Robinhood: no adapters, swaps off", () => {
+    expect(load(4663).swapAdapter).toBeNull();
+  });
+  it("Base without the PR #4 adapter (only uniswapV3Adapter present) => swaps off", () => {
+    const rec = JSON.parse(JSON.stringify(withAdapters["8453"])) as { addresses: Record<string, string> };
+    delete rec.addresses.uniswapV3SwapRouter02Adapter;
+    rec.addresses.uniswapV3Adapter = A1;
+    expect(resolveChainDeployment(8453, { records: { "8453": rec }, useFork: true, env: {} }).swapAdapter).toBeNull();
+  });
+});
+
 describe("mainnet-labelled records", () => {
   it("are used without any flag, are not flagged as fork", () => {
     const d = resolveChainDeployment(1, { records: { "1": mainnetLike("ethereum") }, useFork: false, env: {} });
     expect(d.origin).toBe("record");
     expect(d.isFork).toBe(false);
     expect(d.recordSource).toBe("mainnet");
-    expect(d.fromBlock).toBe(BigInt(26103730));
+    expect(d.fromBlock).toBe(BigInt(26103768));
     expect(d.fromBlockSource).toBe("blockNumberAtDeploy");
   });
-  it("Orbit chains: blockNumberAtDeploy is not trusted; explicit deployBlock is", () => {
+  it("Orbit chains: chain-native blockNumberAtDeploy (record has evmBlockNumberAtDeploy) is used", () => {
+    const d = resolveChainDeployment(42161, { records: { "42161": mainnetLike("arbitrum") }, useFork: false, env: {} });
+    expect(d.fromBlock).toBe(BigInt(510944643));
+  });
+  it("Orbit chains, old record shape (no evmBlockNumberAtDeploy): blockNumberAtDeploy is an L1 number and is not trusted; explicit deployBlock is", () => {
     const base = mainnetLike("arbitrum");
+    delete base.evmBlockNumberAtDeploy;
+    base.blockNumberAtDeploy = 26103733;
     const noBlock = resolveChainDeployment(42161, { records: { "42161": base }, useFork: false, env: {} });
     expect(noBlock.fromBlock).toBeNull();
     expect(noBlock.notes.join(" ")).toMatch(/Orbit/);

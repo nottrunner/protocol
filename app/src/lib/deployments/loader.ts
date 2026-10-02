@@ -21,7 +21,7 @@ const ADDRESS_KEYS: readonly ProtocolAddressKey[] = [
   "addressListRegistry", "comptrollerLib", "dispatcher", "externalPositionFactory", "externalPositionManager",
   "feeManager", "fundDeployer", "fundValueCalculator", "fundValueCalculatorRouter", "gasRelayPaymasterFactory",
   "globalConfigProxy", "integrationManager", "policyManager", "protocolFeeReserveProxy", "protocolFeeTracker",
-  "uintListRegistry", "valueInterpreter", "vaultLib",
+  "uintListRegistry", "valueInterpreter", "vaultLib", "uniswapV3Adapter", "uniswapV3SwapRouter02Adapter", "paraSwapV6Adapter",
 ];
 
 export type LoaderInput = {
@@ -111,11 +111,15 @@ function resolveFromBlock(
   // a valid fromBlock there.
   const fork = nonNegInt(rec.forkBlock);
   if (source !== "mainnet" && fork !== null && fork > BigInt(0)) return { block: fork, src: "forkBlock" };
+  // deploy-scripts (f5eec49) writes `blockNumberAtDeploy` chain-native and the EVM-visible number separately as
+  // `evmBlockNumberAtDeploy`. Older records have no such field: there `blockNumberAtDeploy` is the EVM number, which is only
+  // chain-native on non-Orbit chains.
   const atDeploy = nonNegInt(rec.blockNumberAtDeploy);
-  if (atDeploy !== null && atDeploy > BigInt(0) && !ORBIT_CHAIN_IDS.has(chainId)) {
+  const chainNative = rec.evmBlockNumberAtDeploy !== undefined || !ORBIT_CHAIN_IDS.has(chainId);
+  if (atDeploy !== null && atDeploy > BigInt(0) && chainNative) {
     return { block: atDeploy, src: "blockNumberAtDeploy" };
   }
-  if (ORBIT_CHAIN_IDS.has(chainId)) {
+  if (!chainNative) {
     notes.push(
       "record has no usable deploy block for this Orbit chain (blockNumberAtDeploy is an L1 number); log scans use a bounded look-back",
     );
@@ -150,9 +154,10 @@ function buildRecordParts(rec: Record<string, unknown>, notes: string[]) {
     else notes.push(`record addresses.${k} is not a valid address (ignored)`);
   }
   const adapters: Partial<Record<SwapAdapterKind, Address>> = {};
+  // Adapter addresses live in `addresses` (as written by the register-adapters deploy step); an `adapters` section is also accepted.
   const rawAdapters = (rec.adapters ?? {}) as Record<string, unknown>;
-  const ua = asAddressLike(rawAdapters.uniswapV3Adapter);
-  const ub = asAddressLike(rawAdapters.uniswapV3SwapRouter02Adapter);
+  const ua = addresses.uniswapV3Adapter ?? asAddressLike(rawAdapters.uniswapV3Adapter);
+  const ub = addresses.uniswapV3SwapRouter02Adapter ?? asAddressLike(rawAdapters.uniswapV3SwapRouter02Adapter);
   if (ua) adapters.uniswapV3 = ua;
   if (ub) adapters.uniswapV3SwapRouter02 = ub;
   const ext = (rec.externalContracts ?? {}) as Record<string, unknown>;

@@ -35,7 +35,7 @@ export function classifyRecord(raw) {
 /** Fields that are safe and useful to ship to the browser (no log paths, hashes of local files, etc.). */
 const KEEP = [
   "chain", "chainId", "kind", "mainnet", "label", "runKind", "forkBlock", "deployBlock", "blockNumberAtDeploy",
-  "blockTimestampAtDeploy", "scriptCommit", "chainlinkStaleRateThresholdSeconds", "addresses", "denominationAsset",
+  "evmBlockNumberAtDeploy", "approvedAdaptersListId", "blockTimestampAtDeploy", "scriptCommit", "chainlinkStaleRateThresholdSeconds", "addresses", "denominationAsset",
   "denominationAssets", "adapters", "externalContracts",
 ];
 

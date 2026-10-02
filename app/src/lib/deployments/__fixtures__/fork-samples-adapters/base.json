@@ -12,36 +12,39 @@
     "gasRelayPaymasterFactory": "0x193570f6D9eBA8aa520b8F2243EA2fF4c4555e01",
     "globalConfigProxy": "0x17434891234feAe6a4389A26Fa566c2610a1b156",
     "integrationManager": "0x523609B8AbDD37EcbA4f8BD7C504f205359c4df5",
+    "paraSwapV6Adapter": "0x9868b1981e446F65938e6955d051a2ED6b51f8d0",
     "policyManager": "0x5A8d6042B0F36a5b4BF30894F16E558E46D5f922",
     "protocolFeeReserveProxy": "0xA19c9bC872a46Ad2B3EED81ec43349F8DB8f8D9F",
     "protocolFeeTracker": "0x910fe3cbAbb23DD5Bb86dB4fB1E2A8872afFc92B",
     "uintListRegistry": "0xa5B8e16F3f25Ba623d26D7C0864A1b798A13c162",
+    "uniswapV3SwapRouter02Adapter": "0x92D384d66B0c71A42bbD25a533C29E38FE4B136e",
     "valueInterpreter": "0xe9388c7B36931ca983751F065C69a3ACA7195CBB",
     "vaultLib": "0xa574068D02f662BB73C7bE69280c13Bb552F92b0"
   },
-  "blockNumberAtDeploy": 52072120,
+  "approvedAdaptersListId": 1,
+  "blockNumberAtDeploy": 52072368,
   "blockNumberNote": "blockNumberAtDeploy and forkBlock are chain-native block numbers (eth_blockNumber; L2 blocks on arbitrum/robinhood). evmBlockNumberAtDeploy is block.number as seen inside the EVM (the L1 block number on arbitrum/robinhood).",
-  "blockTimestampAtDeploy": 1790933622,
+  "blockTimestampAtDeploy": 1790934115,
   "chain": "base",
   "chainId": 8453,
   "chainlinkStaleRateThresholdSeconds": 172800,
-  "configSha256": "1db19b2b4d6af81d44ec4072354f4721b1e54a882e8d89dabeca2393c88ae7d4",
+  "configSha256": "d3985670ffa650adcbecf1c03cef6a89e2a10b6bebbb33ba4d6b01b7aaab5a8f",
   "denominationAsset": {
     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
     "symbol": "USDC"
   },
   "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-  "evmBlockNumberAtDeploy": 52072120,
-  "forkBlock": 52072119,
+  "evmBlockNumberAtDeploy": 52072368,
+  "forkBlock": 52072367,
   "kind": "fork, not mainnet",
   "label": "ANVIL FORK RUN - NOT A MAINNET DEPLOYMENT. Addresses exist only on a throwaway local fork.",
   "mainnet": false,
   "runKind": "fork",
-  "scriptCommit": "f5eec49db1cfcfabc61fefce81a3e5880b99bc10",
+  "scriptCommit": "653c4a2675cba1904e107720add434dffeda15fb",
   "scriptTreeDirty": "false",
   "log": {
     "path": "deployments/logs/base.fork-run.txt",
-    "sha256": "4531b040d9ef79e89625fca6ced1734c075a3f3ea377429562ceeab98a3cdea3"
+    "sha256": "e14d29c113edc1ae2b7a21f9bbf3a3f07b785a06807073e3e427db4ff6dcd33f"
   },
-  "reproduce": "script/fork-dry-run.sh base 52072119  (same commit + same fork block + same sender => same addresses)"
+  "reproduce": "script/fork-dry-run.sh base 52072367  (same commit + same fork block + same sender => same addresses)"
 }

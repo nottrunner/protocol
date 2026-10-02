@@ -5,7 +5,9 @@ export type ProtocolAddressKey =
   | "addressListRegistry" | "comptrollerLib" | "dispatcher" | "externalPositionFactory" | "externalPositionManager"
   | "feeManager" | "fundDeployer" | "fundValueCalculator" | "fundValueCalculatorRouter" | "gasRelayPaymasterFactory"
   | "globalConfigProxy" | "integrationManager" | "policyManager" | "protocolFeeReserveProxy" | "protocolFeeTracker"
-  | "uintListRegistry" | "valueInterpreter" | "vaultLib";
+  | "uintListRegistry" | "valueInterpreter" | "vaultLib"
+  // adapters (written by the register-adapters deploy step; absent until then)
+  | "uniswapV3Adapter" | "uniswapV3SwapRouter02Adapter" | "paraSwapV6Adapter";
 
 export type ProtocolAddressMap = Partial<Record<ProtocolAddressKey, Address>>;
 

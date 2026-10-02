@@ -12,36 +12,39 @@
     "gasRelayPaymasterFactory": "0x3A06016bcbeC3fb273005475E65bC7665709dbAd",
     "globalConfigProxy": "0x82433782eD75BF34F230025b72513aee77cB0C00",
     "integrationManager": "0x51A3063228F351481408CfEad5C865122A88a0b5",
+    "paraSwapV6Adapter": "0x0B899FdDF0C1e184037c856378995169C5804905",
     "policyManager": "0xC1475Fd996140b376e664f5628cF3de705F9f1fE",
     "protocolFeeReserveProxy": "0xAd4F8e5a6fcC0bDe8fe3E7D0Aaeb15B892783692",
     "protocolFeeTracker": "0x279Ae4364Cd9C92147C69d07257f8047Bb0cD690",
     "uintListRegistry": "0xD8A95258D2D074fDAD9eB4F92e90cC44F9dF8f5C",
+    "uniswapV3Adapter": "0x3739d0418dB3e3DFD153C75D33B5654f576C5600",
     "valueInterpreter": "0x0dc298A9cBe8622b41CFcA1E60bF10bBC8a74C61",
     "vaultLib": "0x9D34cDcC5BE86511FEc4A1771fa3ec581dC63603"
   },
-  "blockNumberAtDeploy": 26103768,
+  "approvedAdaptersListId": 1,
+  "blockNumberAtDeploy": 26103810,
   "blockNumberNote": "blockNumberAtDeploy and forkBlock are chain-native block numbers (eth_blockNumber; L2 blocks on arbitrum/robinhood). evmBlockNumberAtDeploy is block.number as seen inside the EVM (the L1 block number on arbitrum/robinhood).",
-  "blockTimestampAtDeploy": 1790933568,
+  "blockTimestampAtDeploy": 1790934072,
   "chain": "ethereum",
   "chainId": 1,
   "chainlinkStaleRateThresholdSeconds": 172800,
-  "configSha256": "a294be9d9008a4cfede767cf8da7beed0d619f18b016b7627e6a69429a0c717f",
+  "configSha256": "c0ecc4815f5c729676b353b0234b9718c081f8b01e41042128d77d3341d1a87c",
   "denominationAsset": {
     "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
     "symbol": "USDC"
   },
   "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-  "evmBlockNumberAtDeploy": 26103768,
-  "forkBlock": 26103767,
+  "evmBlockNumberAtDeploy": 26103810,
+  "forkBlock": 26103809,
   "kind": "fork, not mainnet",
   "label": "ANVIL FORK RUN - NOT A MAINNET DEPLOYMENT. Addresses exist only on a throwaway local fork.",
   "mainnet": false,
   "runKind": "fork",
-  "scriptCommit": "f5eec49db1cfcfabc61fefce81a3e5880b99bc10",
+  "scriptCommit": "653c4a2675cba1904e107720add434dffeda15fb",
   "scriptTreeDirty": "false",
   "log": {
     "path": "deployments/logs/ethereum.fork-run.txt",
-    "sha256": "508c92bdea2600d82b0cbe7b42d757861be294d9f6ebda358d632619f23417e2"
+    "sha256": "648d0dcf3b24781a0dd8fb3fe984b087f383153d350adfdb5ae1010c24cf4d2c"
   },
-  "reproduce": "script/fork-dry-run.sh ethereum 26103767  (same commit + same fork block + same sender => same addresses)"
+  "reproduce": "script/fork-dry-run.sh ethereum 26103809  (same commit + same fork block + same sender => same addresses)"
 }

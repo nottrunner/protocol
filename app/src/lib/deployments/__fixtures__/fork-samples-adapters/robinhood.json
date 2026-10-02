@@ -19,29 +19,29 @@
     "valueInterpreter": "0xEd00171E28B55C3ba9bE26a474611755C860E6F0",
     "vaultLib": "0xd831912d86BE956A131cfe14E90C86c717407489"
   },
-  "blockNumberAtDeploy": 78127521,
+  "blockNumberAtDeploy": 78132471,
   "blockNumberNote": "blockNumberAtDeploy and forkBlock are chain-native block numbers (eth_blockNumber; L2 blocks on arbitrum/robinhood). evmBlockNumberAtDeploy is block.number as seen inside the EVM (the L1 block number on arbitrum/robinhood).",
-  "blockTimestampAtDeploy": 1790933648,
+  "blockTimestampAtDeploy": 1790934147,
   "chain": "robinhood",
   "chainId": 4663,
   "chainlinkStaleRateThresholdSeconds": 172800,
-  "configSha256": "140dbe1a36fc284e475ca87041d0093fed31156330da255d435a6763765e628c",
+  "configSha256": "141c6245077a66ccc99c5afbcdb6dd8f6db8d6c30969d3211f3a3cb28730aae6",
   "denominationAsset": {
     "address": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
     "symbol": "USDG"
   },
   "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-  "evmBlockNumberAtDeploy": 26103773,
-  "forkBlock": 78127520,
+  "evmBlockNumberAtDeploy": 26103815,
+  "forkBlock": 78132470,
   "kind": "fork, not mainnet",
   "label": "ANVIL FORK RUN - NOT A MAINNET DEPLOYMENT. Addresses exist only on a throwaway local fork.",
   "mainnet": false,
   "runKind": "fork",
-  "scriptCommit": "f5eec49db1cfcfabc61fefce81a3e5880b99bc10",
+  "scriptCommit": "653c4a2675cba1904e107720add434dffeda15fb",
   "scriptTreeDirty": "false",
   "log": {
     "path": "deployments/logs/robinhood.fork-run.txt",
-    "sha256": "46dc2a7a4c6e45703cf317c11e5bd75cfc5ac9c7e42d5325e390c1a28f8a7ebf"
+    "sha256": "5860b1479176603fd8140ed4fa0140ff22ac678dd215939e34ea3aabdf2233be"
   },
-  "reproduce": "script/fork-dry-run.sh robinhood 78127520  (same commit + same fork block + same sender => same addresses)"
+  "reproduce": "script/fork-dry-run.sh robinhood 78132470  (same commit + same fork block + same sender => same addresses)"
 }
