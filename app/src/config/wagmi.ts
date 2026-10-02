@@ -1,7 +1,7 @@
 import { connectorsForWallets, getDefaultConfig, getDefaultWallets, type WalletList } from "@rainbow-me/rainbowkit";
 import { coinbaseWallet, injectedWallet } from "@rainbow-me/rainbowkit/wallets";
 import { createConfig, http } from "wagmi";
-import { arbitrumChain, baseChain, ethereumChain, robinhoodChain, supportedChains } from "./chains";
+import { arbitrumChain, baseChain, ethereumChain, hyperEvmChain, robinhoodChain, supportedChains } from "./chains";
 import { rpcUrls } from "./rpc";
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
@@ -13,6 +13,7 @@ const transports = {
   [baseChain.id]: http(rpcUrls.base),
   [arbitrumChain.id]: http(rpcUrls.arbitrum),
   [robinhoodChain.id]: http(rpcUrls.robinhood),
+  [hyperEvmChain.id]: http(rpcUrls.hyperevm),
 } as const;
 
 /**

@@ -20,11 +20,31 @@ export const robinhoodChain = defineChain({
   },
 });
 
+/**
+ * HyperEVM (Hyperliquid), chain id 999. Verified: eth_chainId = 0x3e7 on https://rpc.hyperliquid.xyz/evm (2026-10-02),
+ * gas token HYPE (18 decimals; https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/hyperevm).
+ * RPC override: NEXT_PUBLIC_RPC_URL_HYPEREVM (see rpc.ts). Explorer: https://hyperevmscan.io (Etherscan-family).
+ * No multicall3 entry is set: do not assume one until verified for this chain.
+ * Dual-block chain: contract deployments of our core need big blocks (see research/chain-feasibility.md §9); the app only
+ * sends vault/deposit/redeem transactions, which fit in 3M-gas small blocks.
+ */
+export const hyperEvmChain = defineChain({
+  id: 999,
+  name: "HyperEVM",
+  nativeCurrency: { name: "HYPE", symbol: "HYPE", decimals: 18 },
+  rpcUrls: {
+    default: { http: [rpcUrls.hyperevm] },
+  },
+  blockExplorers: {
+    default: { name: "HyperEVMScan", url: "https://hyperevmscan.io" },
+  },
+});
+
 export const ethereumChain = { ...mainnet, rpcUrls: { default: { http: [rpcUrls.ethereum] } } } as const satisfies Chain;
 export const baseChain = { ...base, rpcUrls: { default: { http: [rpcUrls.base] } } } as const satisfies Chain;
 export const arbitrumChain = { ...arbitrum, rpcUrls: { default: { http: [rpcUrls.arbitrum] } } } as const satisfies Chain;
 
-export const supportedChains = [ethereumChain, baseChain, arbitrumChain, robinhoodChain] as const;
+export const supportedChains = [ethereumChain, baseChain, arbitrumChain, robinhoodChain, hyperEvmChain] as const;
 
 export type SupportedChain = (typeof supportedChains)[number];
 export type SupportedChainId = SupportedChain["id"];

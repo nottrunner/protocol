@@ -5,7 +5,7 @@ import { supportedChains } from "@/config/chains";
 import { useSelectedChain } from "./useSelectedChain";
 
 /**
- * Dropdown for the four supported chains. Connected: switches the wallet chain.
+ * Dropdown for the supported chains. Connected: switches the wallet chain.
  * Not connected: only changes which chain the app reads from (stored in the URL-less local state).
  */
 export function ChainSwitcher() {
