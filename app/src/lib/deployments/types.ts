@@ -16,11 +16,11 @@ export type DenominationAsset = { symbol: string; address: Address };
 /** Where the record came from. Only "mainnet" records are used by default; see scripts/deployment-records.mjs. */
 export type RecordSource = "mainnet" | "fork" | "unlabelled";
 
-/** Swap adapters recognised by the app. `uniswapV3` = original SwapRouter (Ethereum, Arbitrum);
- *  `uniswapV3SwapRouter02` = the PR #4 variant for routers without `deadline` (Base). */
-export type SwapAdapterKind = "uniswapV3" | "uniswapV3SwapRouter02";
+/** Swap routes (adapters) recognised by the app. `uniswapV3` = original SwapRouter (Ethereum, Arbitrum);
+ *  `uniswapV3SwapRouter02` = the PR #4 variant for routers without `deadline` (Base); `paraSwapV6` = ParaSwap/Velora v6. */
+export type SwapAdapterKind = "uniswapV3" | "uniswapV3SwapRouter02" | "paraSwapV6";
 
-export type SwapAdapter = { kind: SwapAdapterKind; address: Address; quoter: Address | null };
+export type SwapAdapter = { kind: SwapAdapterKind; address: Address; quoter: Address | null; label: string };
 
 export type FromBlockSource = "env" | "deployBlock" | "forkBlock" | "blockNumberAtDeploy";
 
@@ -43,8 +43,12 @@ export type ChainDeployment = {
   /** Adapter addresses present in the record / env (not yet filtered for per-chain eligibility). */
   adapters: Partial<Record<SwapAdapterKind, Address>>;
   quoter: Address | null;
-  /** The adapter the swap UI may use on this chain, or null (=> "Swaps not enabled on this chain"). */
+  /** Routes the swap UI may offer on this chain, default (Uniswap) first. Empty => "Swaps not enabled on this chain". */
+  swapAdapters: SwapAdapter[];
+  /** The default route (first of swapAdapters) or null. */
   swapAdapter: SwapAdapter | null;
+  /** AddressListRegistry id of the approved-adapters list (informational; written by the register-adapters deploy step). */
+  approvedAdaptersListId: number | null;
   /** Human-readable notes/warnings (ignored records, superseded record, bad values). */
   notes: string[];
 };
@@ -59,4 +63,5 @@ export type ChainEnvOverrides = {
   uniswapV3Adapter?: string;
   uniswapV3SwapRouter02Adapter?: string;
   uniswapV3Quoter?: string;
+  paraSwapV6Adapter?: string;
 };

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseDenominationAssetsEnv, parseInlinedRecords, resolveChainDeployment, resolveSwapAdapter } from "./loader";
+import { parseDenominationAssetsEnv, parseInlinedRecords, resolveChainDeployment, resolveSwapAdapters } from "./loader";
 
 const FIX = join(__dirname, "__fixtures__");
 const read = (p: string) => JSON.parse(readFileSync(join(FIX, p), "utf8")) as Record<string, unknown>;
@@ -69,35 +69,38 @@ describe("fork-samples shapes", () => {
   });
 });
 
-describe("fork-samples with adapters (shape of the register-adapters deploy step)", () => {
+describe("fork-samples with adapters (shape of PR #8 feat/register-adapters @ 3362c1f)", () => {
   const withAdapters = Object.fromEntries(
     Object.entries(CHAINS).map(([n, id]) => [String(id), read(`fork-samples-adapters/${n}.json`)]),
   );
   const load = (id: number) => resolveChainDeployment(id, { records: withAdapters, useFork: true, env: {} });
-  it("Ethereum + Arbitrum: swap uses addresses.uniswapV3Adapter and the official QuoterV2", () => {
+  const addr = (id: number, k: string) => (withAdapters[String(id)] as { addresses: Record<string, string> }).addresses[k]?.toLowerCase();
+  it("Ethereum + Arbitrum: routes are [UniswapV3Adapter, ParaSwapV6Adapter]; Uniswap default with the official QuoterV2", () => {
     for (const id of [1, 42161]) {
       const d = load(id);
-      const raw = withAdapters[String(id)] as { addresses: Record<string, string> };
-      expect(d.swapAdapter?.kind).toBe("uniswapV3");
-      expect(d.swapAdapter?.address.toLowerCase()).toBe(raw.addresses.uniswapV3Adapter?.toLowerCase());
+      expect(d.swapAdapters.map((r) => r.kind)).toEqual(["uniswapV3", "paraSwapV6"]);
+      expect(d.swapAdapter?.address.toLowerCase()).toBe(addr(id, "uniswapV3Adapter"));
+      expect(d.swapAdapters[1]?.address.toLowerCase()).toBe(addr(id, "paraSwapV6Adapter"));
       expect(d.swapAdapter?.quoter).toBe("0x61fFE014bA17989E743c5F6cB21bF9697530B21e");
+      expect(d.approvedAdaptersListId).toBe(1);
     }
   });
-  it("Base: swap uses ONLY uniswapV3SwapRouter02Adapter (paraswap is not a UI swap adapter)", () => {
+  it("Base: routes are [UniswapV3SwapRouter02Adapter, ParaSwapV6Adapter]", () => {
     const d = load(8453);
-    const raw = withAdapters["8453"] as { addresses: Record<string, string> };
-    expect(d.swapAdapter?.kind).toBe("uniswapV3SwapRouter02");
-    expect(d.swapAdapter?.address.toLowerCase()).toBe(raw.addresses.uniswapV3SwapRouter02Adapter?.toLowerCase());
+    expect(d.swapAdapters.map((r) => r.kind)).toEqual(["uniswapV3SwapRouter02", "paraSwapV6"]);
+    expect(d.swapAdapter?.address.toLowerCase()).toBe(addr(8453, "uniswapV3SwapRouter02Adapter"));
     expect(d.swapAdapter?.quoter).toBe("0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a");
   });
   it("Robinhood: no adapters, swaps off", () => {
-    expect(load(4663).swapAdapter).toBeNull();
+    expect(load(4663).swapAdapters).toEqual([]);
+    expect(load(4663).approvedAdaptersListId).toBeNull();
   });
-  it("Base without the PR #4 adapter (only uniswapV3Adapter present) => swaps off", () => {
+  it("Base record with only the original-router adapter => swaps off", () => {
     const rec = JSON.parse(JSON.stringify(withAdapters["8453"])) as { addresses: Record<string, string> };
     delete rec.addresses.uniswapV3SwapRouter02Adapter;
+    delete rec.addresses.paraSwapV6Adapter;
     rec.addresses.uniswapV3Adapter = A1;
-    expect(resolveChainDeployment(8453, { records: { "8453": rec }, useFork: true, env: {} }).swapAdapter).toBeNull();
+    expect(resolveChainDeployment(8453, { records: { "8453": rec }, useFork: true, env: {} }).swapAdapters).toEqual([]);
   });
 });
 
@@ -188,27 +191,44 @@ describe("env overrides", () => {
 });
 
 describe("swap adapter eligibility", () => {
-  it("Ethereum and Arbitrum use uniswapV3 only; Base only the SwapRouter02 adapter; Robinhood never", () => {
-    const both = { uniswapV3: A1 as `0x${string}`, uniswapV3SwapRouter02: A2 as `0x${string}` };
-    expect(resolveSwapAdapter(1, both, null)?.kind).toBe("uniswapV3");
-    expect(resolveSwapAdapter(42161, both, null)?.address).toBe(A1);
-    expect(resolveSwapAdapter(8453, both, null)).toMatchObject({ kind: "uniswapV3SwapRouter02", address: A2 });
-    expect(resolveSwapAdapter(8453, { uniswapV3: A1 as `0x${string}` }, null)).toBeNull();
-    expect(resolveSwapAdapter(1, { uniswapV3SwapRouter02: A2 as `0x${string}` }, null)).toBeNull();
-    expect(resolveSwapAdapter(4663, both, null)).toBeNull();
-    expect(resolveSwapAdapter(999, both, null)).toBeNull();
+  const all = {
+    uniswapV3: A1 as `0x${string}`, uniswapV3SwapRouter02: A2 as `0x${string}`, paraSwapV6: A3 as `0x${string}`,
+  };
+  const kinds = (id: number, a: Parameters<typeof resolveSwapAdapters>[1]) => resolveSwapAdapters(id, a, null).map((r) => r.kind);
+  it("Ethereum/Arbitrum: Uniswap first (default), then ParaSwap; the SwapRouter02 adapter is never offered there", () => {
+    expect(kinds(1, all)).toEqual(["uniswapV3", "paraSwapV6"]);
+    expect(kinds(42161, all)).toEqual(["uniswapV3", "paraSwapV6"]);
+    expect(kinds(1, { uniswapV3SwapRouter02: all.uniswapV3SwapRouter02 })).toEqual([]);
   });
-  it("adapters section absent => no swap adapter (UI shows 'Swaps not enabled on this chain')", () => {
-    expect(resolveChainDeployment(1, { records: forkRecords, useFork: true, env: {} }).swapAdapter).toBeNull();
+  it("Base: SwapRouter02 adapter first, then ParaSwap; the original-router adapter is never offered", () => {
+    expect(kinds(8453, all)).toEqual(["uniswapV3SwapRouter02", "paraSwapV6"]);
+    expect(kinds(8453, { uniswapV3: all.uniswapV3 })).toEqual([]);
+    expect(kinds(8453, { paraSwapV6: all.paraSwapV6 })).toEqual(["paraSwapV6"]);
   });
-  it("adapters come from the record (string or {address}) or env, with the official QuoterV2 default", () => {
+  it("Robinhood and unknown chains never offer swaps", () => {
+    expect(kinds(4663, all)).toEqual([]);
+    expect(kinds(999, all)).toEqual([]);
+  });
+  it("a route is offered only when its adapter address is present; quoter only on Uniswap routes", () => {
+    const r = resolveSwapAdapters(1, all, A1 as `0x${string}`);
+    expect(r[0]?.quoter).toBe(A1);
+    expect(r[1]?.quoter).toBeNull();
+    expect(kinds(1, { paraSwapV6: all.paraSwapV6 })).toEqual(["paraSwapV6"]);
+  });
+  it("adapters absent from the record => no routes (UI shows 'Swaps not enabled on this chain')", () => {
+    const d = resolveChainDeployment(1, { records: forkRecords, useFork: true, env: {} });
+    expect(d.swapAdapters).toEqual([]);
+    expect(d.swapAdapter).toBeNull();
+  });
+  it("addresses/adapters sections and env produce routes; QuoterV2 defaults to the official address", () => {
     const rec = { ...forkRecords["1"] as object, adapters: { uniswapV3Adapter: { address: A1 } } };
     const d = resolveChainDeployment(1, { records: { "1": rec }, useFork: true, env: {} });
-    expect(d.swapAdapter).toEqual({ kind: "uniswapV3", address: A1, quoter: "0x61fFE014bA17989E743c5F6cB21bF9697530B21e" });
-    const b = resolveChainDeployment(8453, { records: {}, useFork: false, env: { 8453: { fundDeployer: A1, uniswapV3SwapRouter02Adapter: A2, uniswapV3Quoter: A3 } } });
-    expect(b.swapAdapter).toEqual({ kind: "uniswapV3SwapRouter02", address: A2, quoter: A3 });
+    expect(d.swapAdapter).toMatchObject({ kind: "uniswapV3", address: A1, quoter: "0x61fFE014bA17989E743c5F6cB21bF9697530B21e" });
+    const b = resolveChainDeployment(8453, { records: {}, useFork: false, env: { 8453: { fundDeployer: A1, uniswapV3SwapRouter02Adapter: A2, uniswapV3Quoter: A3, paraSwapV6Adapter: A1 } } });
+    expect(b.swapAdapters.map((r) => r.kind)).toEqual(["uniswapV3SwapRouter02", "paraSwapV6"]);
+    expect(b.swapAdapter).toMatchObject({ address: A2, quoter: A3 });
     const b2 = resolveChainDeployment(8453, { records: {}, useFork: false, env: { 8453: { fundDeployer: A1, uniswapV3Adapter: A2 } } });
-    expect(b2.swapAdapter).toBeNull();
+    expect(b2.swapAdapters).toEqual([]);
   });
 });
 

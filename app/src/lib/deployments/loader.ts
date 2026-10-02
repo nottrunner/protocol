@@ -127,21 +127,31 @@ function resolveFromBlock(
   return { block: null, src: null };
 }
 
+const ROUTE_LABELS: Record<SwapAdapterKind, string> = {
+  uniswapV3: "Uniswap V3 (UniswapV3Adapter, SwapRouter)",
+  uniswapV3SwapRouter02: "Uniswap V3 (UniswapV3SwapRouter02Adapter, SwapRouter02)",
+  paraSwapV6: "ParaSwap v6 (ParaSwapV6Adapter)",
+};
+
 /**
- * Which swap adapter the UI may use. Strict per-chain eligibility, so a mis-registered adapter cannot be offered:
- *  - Ethereum, Arbitrum: `uniswapV3` (UniswapV3Adapter, original SwapRouter).
- *  - Base: ONLY `uniswapV3SwapRouter02` (PR #4 adapter); the original-router adapter does not match Base's router.
- *  - Robinhood Chain (4663) and every other chain: none (phase 1: swaps off).
+ * Which swap routes the UI may offer, strictly per chain and only when the adapter address is in the record/env:
+ *  - Ethereum, Arbitrum: `uniswapV3` (UniswapV3Adapter, original SwapRouter), then `paraSwapV6`.
+ *  - Base: `uniswapV3SwapRouter02` (PR #4 adapter; the original-router adapter does NOT match Base's router and is never
+ *    offered there), then `paraSwapV6`.
+ *  - Robinhood Chain (4663) and every other chain: none (phase 1: swaps off), whatever the record says.
+ * The Uniswap route is first (the default) when available.
  */
-export function resolveSwapAdapter(
+export function resolveSwapAdapters(
   chainId: number,
   adapters: Partial<Record<SwapAdapterKind, Address>>,
   quoter: Address | null,
-): SwapAdapter | null {
-  const kind: SwapAdapterKind | null = chainId === 1 || chainId === 42161 ? "uniswapV3" : chainId === 8453 ? "uniswapV3SwapRouter02" : null;
-  if (!kind) return null;
-  const address = adapters[kind];
-  return address ? { kind, address, quoter } : null;
+): SwapAdapter[] {
+  const order: SwapAdapterKind[] =
+    chainId === 1 || chainId === 42161 ? ["uniswapV3", "paraSwapV6"] : chainId === 8453 ? ["uniswapV3SwapRouter02", "paraSwapV6"] : [];
+  return order.flatMap((kind) => {
+    const address = adapters[kind];
+    return address ? [{ kind, address, quoter: kind === "paraSwapV6" ? null : quoter, label: ROUTE_LABELS[kind] }] : [];
+  });
 }
 
 function buildRecordParts(rec: Record<string, unknown>, notes: string[]) {
@@ -158,8 +168,10 @@ function buildRecordParts(rec: Record<string, unknown>, notes: string[]) {
   const rawAdapters = (rec.adapters ?? {}) as Record<string, unknown>;
   const ua = addresses.uniswapV3Adapter ?? asAddressLike(rawAdapters.uniswapV3Adapter);
   const ub = addresses.uniswapV3SwapRouter02Adapter ?? asAddressLike(rawAdapters.uniswapV3SwapRouter02Adapter);
+  const up = addresses.paraSwapV6Adapter ?? asAddressLike(rawAdapters.paraSwapV6Adapter);
   if (ua) adapters.uniswapV3 = ua;
   if (ub) adapters.uniswapV3SwapRouter02 = ub;
+  if (up) adapters.paraSwapV6 = up;
   const ext = (rec.externalContracts ?? {}) as Record<string, unknown>;
   const quoter = asAddressLike(ext.uniswapV3QuoterV2);
   return { addresses, adapters, quoter, denominationAssets: parseDenominationAssets(rec, notes) };
@@ -227,6 +239,8 @@ export function resolveChainDeployment(chainId: number, input: LoaderInput): Cha
   if (a1) adapters.uniswapV3 = a1;
   const a2 = overlay(env.uniswapV3SwapRouter02Adapter, "NEXT_PUBLIC_UNISWAP_V3_SWAPROUTER02_ADAPTER_*");
   if (a2) adapters.uniswapV3SwapRouter02 = a2;
+  const a3 = overlay(env.paraSwapV6Adapter, "NEXT_PUBLIC_PARASWAP_V6_ADAPTER_*");
+  if (a3) adapters.paraSwapV6 = a3;
   const q = overlay(env.uniswapV3Quoter, "NEXT_PUBLIC_UNISWAP_V3_QUOTER_*");
   if (q) quoter = q;
   const envDenoms = parseDenominationAssetsEnv(blankToUndefined(env.denominationAssets));
@@ -241,14 +255,15 @@ export function resolveChainDeployment(chainId: number, input: LoaderInput): Cha
     // Nothing usable: do not expose half a deployment.
     return {
       chainId, origin: "none", recordSource: null, isFork: false, addresses: {}, fundDeployer: null,
-      denominationAssets: [], denominationSource: "fallback", fromBlock: null, fromBlockSource: null, adapters: {}, quoter: null, swapAdapter: null, notes,
+      denominationAssets: [], denominationSource: "fallback", fromBlock: null, fromBlockSource: null, adapters: {}, quoter: null, swapAdapters: [], swapAdapter: null, approvedAdaptersListId: null, notes,
     };
   }
 
   // 3) Quoter fallback to the official address; fromBlock; swap eligibility.
   const effQuoter = quoter ?? knownUniswapV3Quoters[chainId] ?? null;
   const fb = resolveFromBlock(chainId, useRecord ? rec : null, useRecord ? source : null, env.deployBlock, notes);
-  const swapAdapter = resolveSwapAdapter(chainId, adapters, effQuoter);
+  const swapAdapters = resolveSwapAdapters(chainId, adapters, effQuoter);
+  const listId = useRecord && rec ? nonNegInt(rec.approvedAdaptersListId) : null;
   const origin = useRecord ? "record" : "env";
   if (denominationAssets.length === 0) {
     // No list in record/env: fall back to the app's verified token list (informational quick-picks).
@@ -268,7 +283,9 @@ export function resolveChainDeployment(chainId: number, input: LoaderInput): Cha
     fromBlockSource: fb.src,
     adapters,
     quoter: effQuoter,
-    swapAdapter,
+    swapAdapters,
+    swapAdapter: swapAdapters[0] ?? null,
+    approvedAdaptersListId: listId === null ? null : Number(listId),
     notes,
   };
 }

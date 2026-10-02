@@ -4,7 +4,7 @@ import { parseInlinedRecords, resolveAllDeployments } from "./loader";
 import type { ChainDeployment } from "./types";
 
 export * from "./types";
-export { parseDenominationAssetsEnv, parseInlinedRecords, resolveChainDeployment, resolveSwapAdapter } from "./loader";
+export { parseDenominationAssetsEnv, parseInlinedRecords, resolveChainDeployment, resolveSwapAdapters } from "./loader";
 export type { LoaderInput } from "./loader";
 
 /**
@@ -23,7 +23,7 @@ export const deployments: Record<number, ChainDeployment> = resolveAllDeployment
 
 const NONE = (chainId: number): ChainDeployment => ({
   chainId, origin: "none", recordSource: null, isFork: false, addresses: {}, fundDeployer: null, denominationAssets: [],
-  denominationSource: "fallback", fromBlock: null, fromBlockSource: null, adapters: {}, quoter: null, swapAdapter: null,
+  denominationSource: "fallback", fromBlock: null, fromBlockSource: null, adapters: {}, quoter: null, swapAdapters: [], swapAdapter: null, approvedAdaptersListId: null,
   notes: [],
 });
 

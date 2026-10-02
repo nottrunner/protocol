@@ -15,6 +15,7 @@ export const envOverridesByChain: Record<number, ChainEnvOverrides> = {
     uniswapV3Adapter: process.env.NEXT_PUBLIC_UNISWAP_V3_ADAPTER_ETHEREUM,
     uniswapV3SwapRouter02Adapter: process.env.NEXT_PUBLIC_UNISWAP_V3_SWAPROUTER02_ADAPTER_ETHEREUM,
     uniswapV3Quoter: process.env.NEXT_PUBLIC_UNISWAP_V3_QUOTER_ETHEREUM,
+    paraSwapV6Adapter: process.env.NEXT_PUBLIC_PARASWAP_V6_ADAPTER_ETHEREUM,
   },
   8453: {
     fundDeployer: process.env.NEXT_PUBLIC_FUND_DEPLOYER_BASE,
@@ -25,6 +26,7 @@ export const envOverridesByChain: Record<number, ChainEnvOverrides> = {
     uniswapV3Adapter: process.env.NEXT_PUBLIC_UNISWAP_V3_ADAPTER_BASE,
     uniswapV3SwapRouter02Adapter: process.env.NEXT_PUBLIC_UNISWAP_V3_SWAPROUTER02_ADAPTER_BASE,
     uniswapV3Quoter: process.env.NEXT_PUBLIC_UNISWAP_V3_QUOTER_BASE,
+    paraSwapV6Adapter: process.env.NEXT_PUBLIC_PARASWAP_V6_ADAPTER_BASE,
   },
   42161: {
     fundDeployer: process.env.NEXT_PUBLIC_FUND_DEPLOYER_ARBITRUM,
@@ -35,6 +37,7 @@ export const envOverridesByChain: Record<number, ChainEnvOverrides> = {
     uniswapV3Adapter: process.env.NEXT_PUBLIC_UNISWAP_V3_ADAPTER_ARBITRUM,
     uniswapV3SwapRouter02Adapter: process.env.NEXT_PUBLIC_UNISWAP_V3_SWAPROUTER02_ADAPTER_ARBITRUM,
     uniswapV3Quoter: process.env.NEXT_PUBLIC_UNISWAP_V3_QUOTER_ARBITRUM,
+    paraSwapV6Adapter: process.env.NEXT_PUBLIC_PARASWAP_V6_ADAPTER_ARBITRUM,
   },
   4663: {
     fundDeployer: process.env.NEXT_PUBLIC_FUND_DEPLOYER_ROBINHOOD,
@@ -45,5 +48,6 @@ export const envOverridesByChain: Record<number, ChainEnvOverrides> = {
     uniswapV3Adapter: process.env.NEXT_PUBLIC_UNISWAP_V3_ADAPTER_ROBINHOOD,
     uniswapV3SwapRouter02Adapter: process.env.NEXT_PUBLIC_UNISWAP_V3_SWAPROUTER02_ADAPTER_ROBINHOOD,
     uniswapV3Quoter: process.env.NEXT_PUBLIC_UNISWAP_V3_QUOTER_ROBINHOOD,
+    paraSwapV6Adapter: process.env.NEXT_PUBLIC_PARASWAP_V6_ADAPTER_ROBINHOOD,
   },
 };
