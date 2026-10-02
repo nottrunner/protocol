@@ -19,9 +19,9 @@
     "valueInterpreter": "0xA7CB290ae32fB5E71EeC47b1018E118280fb4bBa",
     "vaultLib": "0x82e8459c70719A85CD491a1e66382975c4e65A78"
   },
-  "blockNumberAtDeploy": 510944643,
+  "blockNumberAtDeploy": 510954436,
   "blockNumberNote": "blockNumberAtDeploy and forkBlock are chain-native block numbers (eth_blockNumber; L2 blocks on arbitrum/robinhood). evmBlockNumberAtDeploy is block.number as seen inside the EVM (the L1 block number on arbitrum/robinhood).",
-  "blockTimestampAtDeploy": 1790933636,
+  "blockTimestampAtDeploy": 1790936330,
   "chain": "arbitrum",
   "chainId": 42161,
   "chainlinkStaleRateThresholdSeconds": 3600,
@@ -31,17 +31,18 @@
     "symbol": "USDC"
   },
   "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-  "evmBlockNumberAtDeploy": 26103772,
-  "forkBlock": 510944642,
+  "evmBlockNumberAtDeploy": 26103996,
+  "forkBlock": 510954435,
   "kind": "fork, not mainnet",
   "label": "ANVIL FORK RUN - NOT A MAINNET DEPLOYMENT. Addresses exist only on a throwaway local fork.",
   "mainnet": false,
   "runKind": "fork",
-  "scriptCommit": "f5eec49db1cfcfabc61fefce81a3e5880b99bc10",
+  "scriptCommit": "b1c639e6a3fd6fd969c4af7f01fd7a65ae9123b0",
   "scriptTreeDirty": "false",
+  "simulated": true,
   "log": {
     "path": "deployments/logs/arbitrum.fork-run.txt",
-    "sha256": "22649914689a3d1ca841f0f48026d9ba99649f0d681345b4afe840c1f7a460b5"
+    "sha256": "876128874008278fda5f130090152833e783ff7b6e2dd5037b7681d70642a9d9"
   },
-  "reproduce": "script/fork-dry-run.sh arbitrum 510944642  (same commit + same fork block + same sender => same addresses)"
+  "reproduce": "script/fork-dry-run.sh arbitrum 510954435  (same commit + same fork block + same sender => same addresses)"
 }

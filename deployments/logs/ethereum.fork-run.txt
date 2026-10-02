@@ -1,6 +1,4 @@
-Compiling 13 files with Solc 0.8.19
-Solc 0.8.19 finished in 913.16ms
-Compiler run successful!
+No files changed, compilation skipped
 Script ran successfully.
 
 == Return ==
@@ -36,13 +34,13 @@ r_: struct DeployCore.Release Release({ gasRelayPaymasterFactory: 0x3A06016bcbeC
 
 Chain 1
 
-Estimated max fee per gas: 0.230824524 gwei
-Estimated base fee per gas: 0.114912262 gwei
-Estimated max priority fee per gas: 0.001 gwei
+Estimated max fee per gas: 0.197602632 gwei
+Estimated base fee per gas: 0.098563816 gwei
+Estimated max priority fee per gas: 0.000475 gwei
 
 Estimated total gas used for script: 48555145
 
-Estimated amount required: 0.01120771823237598 ETH
+Estimated amount required: 0.00959462444914164 ETH
 
 ==========================
 
