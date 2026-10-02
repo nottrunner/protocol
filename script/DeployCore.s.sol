@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 import {Script} from "forge-std/Script.sol";
 import {console2} from "forge-std/console2.sol";
+import {VmSafe} from "forge-std/Vm.sol";
 
 /// @dev Minimal inline interfaces: tests/interfaces/internal/* is generated (gitignored) and must not be
 /// required to run deploy scripts.
@@ -43,6 +44,13 @@ interface IValueInterpreterDeploy {
 
 interface VmKeyExists {
     function keyExistsJson(string calldata, string calldata) external view returns (bool);
+}
+
+/// @dev `vm.isContext` is not in the pinned forge-std Vm interface. ForgeContext enum values used:
+/// ScriptDryRun = 5 (`forge script` without --broadcast), ScriptBroadcast = 6 (`forge script --broadcast`),
+/// ScriptResume = 7 (`forge script --resume`).
+interface VmContext {
+    function isContext(uint8 context) external view returns (bool);
 }
 
 /// @dev `vm.rpc` is not in the pinned forge-std Vm interface; used only to detect an Anvil node (`anvil_nodeInfo`).
@@ -109,6 +117,8 @@ contract DeployCore is Script {
 
     function run() external returns (Persistent memory p_, Release memory r_) {
         Cfg memory c = loadConfig(vm.envString("CHAIN"));
+        // Fail BEFORE any transaction is simulated or sent if RUN_KIND / --broadcast / node type are inconsistent
+        preflight(c.chain);
 
         vm.startBroadcast();
         p_ = deployPersistent();
@@ -125,28 +135,156 @@ contract DeployCore is Script {
         writeDeployment(c, p_, r_);
     }
 
-    /// @dev Writes the addresses + provenance to a JSON file. Safe by default: nothing is written unless the env
-    /// var RUN_KIND is set. Metadata comes from env (set by script/fork-dry-run.sh): RUN_KIND, GIT_SHA, GIT_DIRTY,
-    /// CONFIG_SHA256, FORK_BLOCK, OUTPUT_PATH (default deployments/<chain>.json).
-    ///
-    /// Two kinds may write deployments/<chain>.json and the file always says which one it is, so a fork record can
-    /// never be mistaken for a mainnet deployment (and vice versa):
-    ///   RUN_KIND=fork      -> "kind": "fork, not mainnet", "mainnet": false. Requires the RPC to be an Anvil node.
-    ///   RUN_KIND=broadcast -> "kind": "mainnet broadcast",  "mainnet": true.  Refused on an Anvil node.
-    /// A real broadcast simply overwrites the fork record at the same path.
+    // DEPLOYMENT RECORDS
+    //
+    // Safety model. A record under deployments/ must never claim something that did not happen:
+    //  * Nothing is written unless RUN_KIND is set (fork | broadcast). OUTPUT_PATH is gone: the path is always
+    //    deployments/<chain>.json (or deployments/<chain>.pending.json), and foundry.toml only grants fs access to those files.
+    //  * RUN_KIND=fork needs an Anvil node. It writes deployments/<chain>.json with "kind": "fork, not mainnet",
+    //    "mainnet": false. "simulated" is true for a plain simulation and false when the txs were broadcast to the Anvil.
+    //  * RUN_KIND=broadcast needs a NON-Anvil node. While the script runs, its transactions are only simulated: they
+    //    reach the chain after the script returns, and may fail or be dropped. So the script NEVER writes mainnet: true.
+    //    Without --broadcast it writes nothing. With --broadcast it writes deployments/<chain>.pending.json
+    //    ("mainnet": false, "simulated": true, "pendingBroadcast": true). script/finalize-broadcast.sh turns it into
+    //    deployments/<chain>.json only after checking the broadcast receipts and that code exists on-chain, and only
+    //    it can set "kind": "mainnet broadcast", "mainnet": true (for chain ids in config/mainnet-chain-ids.json).
+    //  * --broadcast on a non-Anvil node without RUN_KIND=broadcast reverts before anything is deployed.
+    //  * A record with "mainnet": true is never overwritten (fork runs: never; pending runs: only with the explicit
+    //    env OVERWRITE_MAINNET_RECORD=true).
+
+    enum RecordAction {
+        None, // no RUN_KIND: no record
+        Fork, // Anvil: write deployments/<chain>.json (fork)
+        SimulationOnly, // RUN_KIND=broadcast on a live node without --broadcast: no record
+        PendingBroadcast // RUN_KIND=broadcast + --broadcast on a live node: write deployments/<chain>.pending.json
+    }
+
+    /// @dev Pure decision table (unit-tested). Reverts on inconsistent combinations.
+    function decideRecordAction(string memory _runKind, bool _anvil, bool _broadcasting)
+        internal
+        pure
+        returns (RecordAction)
+    {
+        if (bytes(_runKind).length == 0) {
+            require(
+                _anvil || !_broadcasting, "DeployCore: --broadcast on a non-Anvil node requires RUN_KIND=broadcast"
+            );
+            return RecordAction.None;
+        }
+        bool isBroadcast = keccak256(bytes(_runKind)) == keccak256("broadcast");
+        require(
+            isBroadcast || keccak256(bytes(_runKind)) == keccak256("fork"), "DeployCore: RUN_KIND must be fork|broadcast"
+        );
+        require(_anvil != isBroadcast, "DeployCore: RUN_KIND=fork needs an Anvil node; broadcast must not be one");
+        if (!isBroadcast) return RecordAction.Fork;
+        return _broadcasting ? RecordAction.PendingBroadcast : RecordAction.SimulationOnly;
+    }
+
+    function preflight(string memory _chain) internal {
+        RecordAction action = decideRecordAction(_runKind(), _isAnvil(), _isBroadcasting());
+        if (action == RecordAction.Fork) {
+            requireNoMainnetRecord(_chain);
+        } else if (action == RecordAction.PendingBroadcast && !_overwriteMainnetRecord()) {
+            requireNoMainnetRecord(_chain);
+        }
+    }
+
+    function requireNoMainnetRecord(string memory _chain) internal {
+        require(
+            !_recordIsMainnet(string.concat("deployments/", _chain, ".json")),
+            "DeployCore: deployments/<chain>.json is a mainnet record and will not be overwritten"
+        );
+    }
+
+    /// @dev Chain ids whose deployments may be labelled "mainnet broadcast" (by script/finalize-broadcast.sh).
+    /// HyperEVM (999) will be added to config/mainnet-chain-ids.json later.
+    function isKnownMainnet(uint256 _chainId) internal returns (bool) {
+        string memory json = vm.readFile(string.concat(vm.projectRoot(), "/config/mainnet-chain-ids.json"));
+        uint256[] memory ids = vm.parseJsonUintArray(json, ".mainnetChainIds");
+        for (uint256 i; i < ids.length; i++) {
+            if (ids[i] == _chainId) return true;
+        }
+        return false;
+    }
+
     function writeDeployment(Cfg memory _c, Persistent memory _p, Release memory _r) internal {
-        string memory runKind = vm.envOr("RUN_KIND", string(""));
-        if (bytes(runKind).length == 0) {
-            console2.log("RUN_KIND not set: deployments/*.json not written");
+        string memory runKind = _runKind();
+        bool broadcasting = _isBroadcasting();
+        RecordAction action = decideRecordAction(runKind, _isAnvil(), broadcasting);
+        if (action == RecordAction.None) {
+            console2.log("RUN_KIND not set: no deployment record written");
             return;
         }
-        bool isBroadcast = keccak256(bytes(runKind)) == keccak256("broadcast");
-        require(
-            isBroadcast || keccak256(bytes(runKind)) == keccak256("fork"), "DeployCore: RUN_KIND must be fork|broadcast"
-        );
-        require(isAnvil() != isBroadcast, "DeployCore: RUN_KIND=fork needs an Anvil node; broadcast must not be one");
+        if (action == RecordAction.SimulationOnly) {
+            console2.log("Simulation on a live node (no --broadcast): no deployment record written");
+            return;
+        }
+        bool pending = action == RecordAction.PendingBroadcast;
+        if (pending) {
+            if (!_overwriteMainnetRecord()) requireNoMainnetRecord(_c.chain);
+        } else {
+            requireNoMainnetRecord(_c.chain);
+        }
+        string memory path = string.concat("deployments/", _c.chain, pending ? ".pending.json" : ".json");
 
-        string memory path = vm.envOr("OUTPUT_PATH", string.concat("deployments/", _c.chain, ".json"));
+        string memory addrJson = _addressesJson(_p, _r);
+        string memory denomJson = _denominationJson(_c);
+
+        string memory o = "deployment";
+        if (pending) {
+            // Never mainnet: true here. The finalizer sets the real kind after checking receipts + on-chain code.
+            vm.serializeString(
+                o,
+                "kind",
+                isKnownMainnet(block.chainid)
+                    ? "mainnet broadcast (PENDING receipt confirmation)"
+                    : "testnet or unknown network (PENDING receipt confirmation)"
+            );
+            vm.serializeBool(o, "mainnet", false);
+            vm.serializeString(
+                o,
+                "label",
+                "UNCONFIRMED: simulated addresses, not yet verified on-chain. Run script/finalize-broadcast.sh after the broadcast."
+            );
+            vm.serializeBool(o, "pendingBroadcast", true);
+            vm.serializeBool(o, "simulated", true);
+        } else {
+            vm.serializeString(o, "kind", "fork, not mainnet");
+            vm.serializeBool(o, "mainnet", false);
+            vm.serializeString(
+                o,
+                "label",
+                "ANVIL FORK RUN - NOT A MAINNET DEPLOYMENT. Addresses exist only on a throwaway local fork."
+            );
+            // true: forge script ran as a simulation against the fork; false: the txs were broadcast to the local Anvil
+            vm.serializeBool(o, "simulated", !broadcasting);
+        }
+        vm.serializeString(o, "runKind", runKind);
+        vm.serializeString(o, "chain", _c.chain);
+        vm.serializeUint(o, "chainId", block.chainid);
+        // Chain-native block number (eth_blockNumber). `block.number` inside the EVM is the L1 block number on
+        // Arbitrum-stack chains (Arbitrum, Robinhood), so both are recorded; forkBlock is also chain-native.
+        vm.serializeUint(o, "blockNumberAtDeploy", _chainBlockNumber());
+        vm.serializeUint(o, "evmBlockNumberAtDeploy", block.number);
+        vm.serializeString(
+            o,
+            "blockNumberNote",
+            "blockNumberAtDeploy and forkBlock are chain-native block numbers (eth_blockNumber; L2 blocks on arbitrum/robinhood). evmBlockNumberAtDeploy is block.number as seen inside the EVM (the L1 block number on arbitrum/robinhood)."
+        );
+        vm.serializeUint(o, "forkBlock", vm.envOr("FORK_BLOCK", uint256(0)));
+        vm.serializeUint(o, "blockTimestampAtDeploy", block.timestamp);
+        vm.serializeAddress(o, "deployer", msg.sender);
+        vm.serializeUint(o, "chainlinkStaleRateThresholdSeconds", _c.staleRateThreshold);
+        vm.serializeString(o, "scriptCommit", vm.envOr("GIT_SHA", string("unknown")));
+        vm.serializeString(o, "scriptTreeDirty", vm.envOr("GIT_DIRTY", string("unknown")));
+        vm.serializeString(o, "configSha256", vm.envOr("CONFIG_SHA256", string("unknown")));
+        vm.serializeString(o, "denominationAsset", denomJson);
+        string memory out = vm.serializeString(o, "addresses", addrJson);
+        _writeRecord(path, out);
+        console2.log("wrote", path);
+    }
+
+    function _addressesJson(Persistent memory _p, Release memory _r) internal returns (string memory) {
         string memory a = "addresses";
         vm.serializeAddress(a, "dispatcher", _p.dispatcher);
         vm.serializeAddress(a, "addressListRegistry", _p.addressListRegistry);
@@ -165,49 +303,55 @@ contract DeployCore is Script {
         vm.serializeAddress(a, "integrationManager", _r.integrationManager);
         vm.serializeAddress(a, "comptrollerLib", _r.comptrollerLib);
         vm.serializeAddress(a, "vaultLib", _r.vaultLib);
-        string memory addrJson = vm.serializeAddress(a, "fundValueCalculator", _r.fundValueCalculator);
+        return vm.serializeAddress(a, "fundValueCalculator", _r.fundValueCalculator);
+    }
 
+    function _denominationJson(Cfg memory _c) internal returns (string memory) {
         string memory d = "denomination";
         vm.serializeString(d, "symbol", _c.denominationSymbol);
-        string memory denomJson = vm.serializeAddress(d, "address", _c.denominationAsset);
+        return vm.serializeAddress(d, "address", _c.denominationAsset);
+    }
 
-        string memory o = "deployment";
-        vm.serializeString(o, "kind", isBroadcast ? "mainnet broadcast" : "fork, not mainnet");
-        vm.serializeBool(o, "mainnet", isBroadcast);
-        vm.serializeString(
-            o,
-            "label",
-            isBroadcast
-                ? "REAL BROADCAST DEPLOYMENT"
-                : "ANVIL FORK RUN - NOT A MAINNET DEPLOYMENT. Addresses exist only on a throwaway local fork."
-        );
-        vm.serializeString(o, "runKind", runKind);
-        vm.serializeString(o, "chain", _c.chain);
-        vm.serializeUint(o, "chainId", block.chainid);
-        // Chain-native block number (eth_blockNumber). `block.number` inside the EVM is the L1 block number on
-        // Arbitrum-stack chains (Arbitrum, Robinhood), so both are recorded; forkBlock is also chain-native.
-        vm.serializeUint(o, "blockNumberAtDeploy", chainBlockNumber());
-        vm.serializeUint(o, "evmBlockNumberAtDeploy", block.number);
-        vm.serializeString(
-            o,
-            "blockNumberNote",
-            "blockNumberAtDeploy and forkBlock are chain-native block numbers (eth_blockNumber; L2 blocks on arbitrum/robinhood). evmBlockNumberAtDeploy is block.number as seen inside the EVM (the L1 block number on arbitrum/robinhood)."
-        );
-        vm.serializeUint(o, "forkBlock", vm.envOr("FORK_BLOCK", uint256(0)));
-        vm.serializeUint(o, "blockTimestampAtDeploy", block.timestamp);
-        vm.serializeAddress(o, "deployer", msg.sender);
-        vm.serializeUint(o, "chainlinkStaleRateThresholdSeconds", _c.staleRateThreshold);
-        vm.serializeString(o, "scriptCommit", vm.envOr("GIT_SHA", string("unknown")));
-        vm.serializeString(o, "scriptTreeDirty", vm.envOr("GIT_DIRTY", string("unknown")));
-        vm.serializeString(o, "configSha256", vm.envOr("CONFIG_SHA256", string("unknown")));
-        vm.serializeString(o, "denominationAsset", denomJson);
-        string memory out = vm.serializeString(o, "addresses", addrJson);
-        vm.writeJson(out, path);
-        console2.log("wrote", path);
+    // Overridable environment hooks (the unit tests replace them; production behaviour is the default below)
+
+    function _runKind() internal virtual returns (string memory) {
+        return vm.envOr("RUN_KIND", string(""));
+    }
+
+    function _overwriteMainnetRecord() internal virtual returns (bool) {
+        return vm.envOr("OVERWRITE_MAINNET_RECORD", false);
+    }
+
+    function _writeRecord(string memory _path, string memory _json) internal virtual {
+        vm.writeJson(_json, _path);
+    }
+
+    function _recordIsMainnet(string memory _path) internal virtual returns (bool) {
+        try vm.fsMetadata(_path) returns (VmSafe.FsMetadata memory) {}
+        catch {
+            return false; // no such file
+        }
+        string memory json = vm.readFile(_path); // a read failure reverts: fail closed
+        if (!VmKeyExists(address(vm)).keyExistsJson(json, ".mainnet")) return false;
+        return vm.parseJsonBool(json, ".mainnet");
+    }
+
+    /// @dev True for `forge script --broadcast` (and --resume): the transactions will really be sent.
+    function _isBroadcasting() internal virtual returns (bool) {
+        return VmContext(address(vm)).isContext(6) || VmContext(address(vm)).isContext(7);
+    }
+
+    /// @dev True iff the RPC answers Anvil's `anvil_nodeInfo`. Real nodes reject it.
+    function _isAnvil() internal virtual returns (bool) {
+        try VmRpc(address(vm)).rpc("anvil_nodeInfo", "[]") returns (bytes memory) {
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     /// @dev Chain-native block number via eth_blockNumber (vm.rpc returns the big-endian bytes of the quantity).
-    function chainBlockNumber() internal returns (uint256 n_) {
+    function _chainBlockNumber() internal virtual returns (uint256 n_) {
         bytes memory r = VmRpc(address(vm)).rpc("eth_blockNumber", "[]");
         for (uint256 i; i < r.length; i++) {
             n_ = (n_ << 8) | uint8(r[i]);
@@ -220,15 +364,6 @@ contract DeployCore is Script {
             if (b[i] >= 0x61 && b[i] <= 0x7a) b[i] = bytes1(uint8(b[i]) - 32);
         }
         return string(b);
-    }
-
-    /// @dev True iff the RPC answers Anvil's `anvil_nodeInfo`. Real nodes reject it.
-    function isAnvil() internal returns (bool) {
-        try VmRpc(address(vm)).rpc("anvil_nodeInfo", "[]") returns (bytes memory) {
-            return true;
-        } catch {
-            return false;
-        }
     }
 
     // CONFIG

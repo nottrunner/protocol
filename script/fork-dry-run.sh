@@ -19,8 +19,9 @@ SENDER=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266   # Anvil public account #0 (a
 [ -n "$PIN" ] || PIN=$(cast block-number --rpc-url "$URL")
 OUTDIR=deployments; LOGDIR=deployments/logs; mkdir -p "$OUTDIR" "$LOGDIR"
 LOG="$LOGDIR/$CHAIN.fork-run.txt"
+# (DeployCore.s.sol enforces the same rule itself; this is just an early, friendlier failure)
 if [ -f "$OUTDIR/$CHAIN.json" ] && [ "$(jq -r '.mainnet // false' "$OUTDIR/$CHAIN.json")" = "true" ]; then
-  echo "refusing to overwrite $OUTDIR/$CHAIN.json: it is a mainnet broadcast record" >&2; exit 1
+  echo "refusing to overwrite $OUTDIR/$CHAIN.json: it is a mainnet record" >&2; exit 1
 fi
 
 # --compute-units-per-second/--retries/--fork-retry-backoff keep public RPCs (e.g. Robinhood, HTTP 429) from failing the fork
@@ -30,7 +31,7 @@ for _ in $(seq 1 180); do cast chain-id --rpc-url "http://127.0.0.1:$PORT" >/dev
 cast rpc --rpc-url "http://127.0.0.1:$PORT" evm_mine >/dev/null 2>&1 || true   # avoids "Excess blob gas not set" on some forks
 
 forge build contracts >/dev/null
-export CHAIN RUN_KIND=fork FORK_BLOCK=$PIN OUTPUT_PATH="$OUTDIR/$CHAIN.json"
+export CHAIN RUN_KIND=fork FORK_BLOCK=$PIN
 export GIT_SHA=$(git rev-parse HEAD) CONFIG_SHA256=$(sha256sum "config/chains/$CHAIN.json" | cut -d' ' -f1)
 export GIT_DIRTY=$([ -z "$(git status --porcelain -- script config foundry.toml contracts)" ] && echo false || echo true)
 forge script script/DeployCore.s.sol:DeployCore --rpc-url "http://127.0.0.1:$PORT" --sender "$SENDER" -vv 2>&1 \

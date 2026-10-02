@@ -20,3 +20,6 @@ cache/
 tests/interfaces/internal/*.sol
 tests/interfaces/internal/*.abi.json
 broadcast/
+
+# Unconfirmed broadcast records (see script/finalize-broadcast.sh)
+deployments/*.pending.json

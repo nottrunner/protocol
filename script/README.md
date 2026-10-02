@@ -24,7 +24,7 @@ config primitives (`chainlink.primitives`), `setReleaseLive`, `Dispatcher.setCur
 A final in-script check prices 1 WETH in the first registered primitive (proves feeds are fresh under the configured stale threshold).
 
 **Not deployed by this PR:** adapters (UniswapV3, ParaSwapV6, OneInchV5, ...), policies, fees, external position libs. Router addresses and
-feature flags in the config are for the follow-up adapter script. `UniswapV3Adapter` is intentionally NOT patched here.
+feature flags in the config are for the follow-up adapter script. The existing `UniswapV3Adapter` is intentionally NOT changed here; PR #4 adds a separate `UniswapV3SwapRouter02Adapter` variant (no deadline protection) for chains that only have SwapRouter02.
 
 ## Config
 
@@ -45,7 +45,7 @@ cp .env.example .env                        # fill in RPC URLs (ETHEREUM_NODE_MA
 source .env
 ```
 
-`foundry.toml` allows reads of `./config` for `vm.readFile`. `CHAIN` selects the config.
+`foundry.toml` `fs_permissions` is narrow: read `./artifacts` and `./config`; read-write only for `./deployments/<chain>.json` and `./deployments/<chain>.pending.json` of the four chains (no wildcard, no `OUTPUT_PATH`; the output path is fixed). `CHAIN` selects the config.
 
 ### Dry run against a local anvil fork (no broadcast)
 
@@ -71,41 +71,62 @@ Fund QA accounts on a fork: see `qa/fixtures.json` and `script/fund-anvil.sh` (l
 
 ### Real deployment (NOT done by this PR; needs explicit go-ahead)
 
-Add `--broadcast` plus a keystore or hardware wallet. Never put a private key on the command line or in the repo:
+Add `--broadcast` plus a keystore or hardware wallet. Never put a private key on the command line or in the repo. A real node
+additionally needs `RUN_KIND=broadcast` (otherwise the script reverts in a preflight, before anything is sent):
 ```bash
 cast wallet import deployer --interactive           # stores an encrypted keystore locally
-CHAIN=base DISPATCHER_OWNER=<multisig> forge script script/DeployCore.s.sol:DeployCore \
+CHAIN=base RUN_KIND=broadcast DISPATCHER_OWNER=<multisig> forge script script/DeployCore.s.sol:DeployCore \
   --rpc-url $ETHEREUM_NODE_BASE --account deployer --broadcast
+# after the transactions are mined:
+script/finalize-broadcast.sh base --rpc-url $ETHEREUM_NODE_BASE     # or FINALIZE_RPC_URL=...; the URL is never printed or stored
 ```
 `DISPATCHER_OWNER` (optional) only *nominates* the new Dispatcher owner at the end; that address must call `claimOwnership()`.
 `MLN_BURNER` (optional env) sets VaultLib's MLN burner (default `address(0)`).
 
 ## Deployment records (`deployments/<chain>.json`)
 
-`DeployCore` writes a JSON record only when `RUN_KIND` is set. Exactly two kinds exist, and every record states which one it is in
-top-level fields, so a fork record cannot be mistaken for a mainnet deployment:
+`forge script` runs the script as a **simulation first** and sends the transactions only after `run()` returns, so the script cannot know
+that a broadcast succeeded. The record model therefore has three states:
 
-| `RUN_KIND` | `kind` | `mainnet` | Allowed on | Written by |
+| Situation | File written | `kind` | `mainnet` | Other flags |
 |---|---|---|---|---|
-| `fork` | `"fork, not mainnet"` | `false` | Anvil nodes only (checked with `anvil_nodeInfo`; anything else reverts) | `script/fork-dry-run.sh` |
-| `broadcast` | `"mainnet broadcast"` | `true` | real nodes only (reverts on an Anvil node) | a real, approved `--broadcast` run (see above) |
+| `RUN_KIND=fork` on Anvil, no `--broadcast` | `deployments/<chain>.json` | `"fork, not mainnet"` | `false` | `simulated: true` |
+| `RUN_KIND=fork` on Anvil with `--broadcast` (QA fork kept alive) | `deployments/<chain>.json` | `"fork, not mainnet"` | `false` | `simulated: false` |
+| `RUN_KIND=broadcast` on a real node, no `--broadcast` | nothing (logs "Simulation on a live node...") | n/a | n/a | n/a |
+| `RUN_KIND=broadcast` on a real node, `--broadcast` | `deployments/<chain>.pending.json` (gitignored) | `"mainnet broadcast (PENDING receipt confirmation)"` or `"testnet or unknown network (PENDING receipt confirmation)"` | **always `false`** | `simulated: true`, `pendingBroadcast: true` |
+| after `script/finalize-broadcast.sh <chain>` succeeds | `deployments/<chain>.json` (pending file deleted) | `"mainnet broadcast"` if the chain id is in the allowlist, else `"testnet or unknown network"` | `true` only for allowlisted chain ids | `confirmation` block (broadcast log path, tx count, first/last block, receipts and code checked) |
 
-Both write to `deployments/<chain>.json`, so a later real broadcast **overwrites** the fork record at the same path (`kind` flips to
-`"mainnet broadcast"`, `mainnet` to `true`, `label` to `REAL BROADCAST DEPLOYMENT`). `script/fork-dry-run.sh` refuses to overwrite a record
-with `"mainnet": true`. Review the `kind`/`mainnet` fields (and `git diff`) before committing a record.
+The deploy script never writes `mainnet: true`. Only `script/finalize_broadcast.py` (wrapper `finalize-broadcast.sh`) can, and it refuses unless
+the RPC rejects `anvil_nodeInfo`, `eth_chainId` equals the pending record's chain id, `broadcast/DeployCore.s.sol/<chainId>/run-latest.json`
+has a receipt with status `0x1` for every transaction (in the file and from the RPC), and every pending address was created by those
+transactions and has code on-chain. It also refuses to overwrite an existing `mainnet: true` record unless `OVERWRITE_MAINNET_RECORD=true`.
 
-Fields: `kind`, `mainnet`, `label`, `runKind`, `chain`, `chainId`, `forkBlock` (0 for a broadcast), `blockNumberAtDeploy`, `evmBlockNumberAtDeploy`, `blockNumberNote`, `blockTimestampAtDeploy`,
+Preflight reverts (before `vm.startBroadcast`): `--broadcast` on a non-Anvil node without `RUN_KIND=broadcast`; `RUN_KIND=fork` on a non-Anvil
+node; `RUN_KIND=broadcast` on Anvil; an unknown `RUN_KIND`; an existing `mainnet: true` record (also for a pending broadcast, unless
+`OVERWRITE_MAINNET_RECORD=true`). `script/fork-dry-run.sh` also refuses to overwrite a `mainnet: true` record. `OUTPUT_PATH` no longer exists.
+
+**Chain id allowlist:** `config/mainnet-chain-ids.json` (`mainnetChainIds`: 1, 8453, 42161, 4663) is the single source of truth for both the
+script and the finalizer. HyperEVM (chain id 999) is not listed yet (todo in that file); until it is added, a HyperEVM broadcast is finalized
+as `"testnet or unknown network"` with `mainnet: false`.
+
+Fields: `kind`, `mainnet`, `simulated`, `label`, `runKind`, `chain`, `chainId`, `forkBlock` (0 for a broadcast), `blockNumberAtDeploy`, `evmBlockNumberAtDeploy`, `blockNumberNote`, `blockTimestampAtDeploy`,
 `deployer`, `chainlinkStaleRateThresholdSeconds`, `denominationAsset` (`symbol`, `address`), `scriptCommit` (git SHA of the script at run time),
 `scriptTreeDirty`, `configSha256`, `addresses`; fork records also carry `log` (path + SHA-256 of `deployments/logs/<chain>.fork-run.txt`)
-and `reproduce`. The addresses of a fork record exist only on a throwaway local fork; nothing was broadcast. No keys are involved (Anvil
-account #0 *address* only; `forge script` runs without `--broadcast`).
+and `reproduce`; pending records add `pendingBroadcast`; finalized records add `confirmation`. `simulated` is additive (older records
+without it were plain simulations); no existing field changed. The addresses of a fork record exist only on a throwaway local fork; nothing
+was broadcast. No keys are involved (Anvil account #0 *address* only; `forge script` runs without `--broadcast`).
+
+Tests: `forge test --match-contract DeployCoreRecordsTest` (decision table, preflight reverts, simulation writes nothing, pending is never
+mainnet, allowlist, record schema, no-overwrite guard, narrowed fs permissions) and `python3 script/test/test_finalize_broadcast.py`
+(finalizer against a fake JSON-RPC node: refuses on Anvil, chain-id mismatch, missing/failed receipts, foreign addresses, no code, mainnet overwrite).
+The finalizer has not been run against a real network.
 
 Block numbers: `forkBlock` and `blockNumberAtDeploy` are **chain-native** (`eth_blockNumber`), i.e. L2 blocks on Arbitrum and Robinhood.
 `evmBlockNumberAtDeploy` is `block.number` as seen inside the EVM, which is the *L1* block number on those two chains (Arbitrum semantics).
 
 To keep a QA deployment alive on a local fork (so fixtures/apps can use it) run the script against the running Anvil with the fork kind and
 Anvil's unlocked account: `RUN_KIND=fork ... forge script ... --rpc-url http://127.0.0.1:<port> --sender 0xf39F... --unlocked --broadcast`.
-`RUN_KIND=broadcast` is refused on Anvil, so such a run can never be labelled a real deployment.
+`RUN_KIND=broadcast` is refused on Anvil, and a fork run is always labelled as a fork, so it can never be labelled a real deployment.
 
 Reproduce a fork record (needs `forge`/`anvil`, `python3`, `jq`, a clean checkout of `scriptCommit`):
 ```bash

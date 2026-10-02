@@ -81,7 +81,7 @@
     "gasRelay": false,
     "protocolFeeBuyback": false,
     "phase": 1,
-    "phaseNote": "Phase 1 = vault creation + deposit/redeem only, USDG denomination. Phase 2 = ParaSwap v6 behind AllowedAdapters. Phase 3 = patched UniswapV3Adapter."
+    "phaseNote": "Phase 1 = vault creation + deposit/redeem only, USDG denomination. Phase 2 = ParaSwap v6 behind AllowedAdapters. Phase 3 = the new UniswapV3SwapRouter02Adapter variant from PR #4 (the existing UniswapV3Adapter is not patched)."
   },
   "excludedTokens": [
     {

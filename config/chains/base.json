@@ -91,7 +91,7 @@
     "protocolFeeBuyback": true
   },
   "todo": [
-    "UniswapV3Adapter calls the original SwapRouter exactInput (with deadline); Base only has SwapRouter02. Uniswap v3 swaps stay disabled until the adapter is patched (separate follow-up PR).",
+    "The existing UniswapV3Adapter calls the original SwapRouter exactInput (with deadline) and is NOT changed; Base only has SwapRouter02. PR #4 adds a separate UniswapV3SwapRouter02Adapter variant (no deadline protection). Uniswap v3 swaps stay disabled (uniswapV3Adapter=false) until that variant is deployed and registered by the follow-up adapter script.",
     "GSN relay hub / trusted forwarder: unknown, gas relay disabled.",
     "MLN/ETH Chainlink feed: none; protocol-fee buyback not usable via a priced MLN."
   ]
