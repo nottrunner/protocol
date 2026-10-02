@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supportedChains } from "@/config/chains";
 import { featureFlags } from "@/config/features";
+import { getDeployment } from "@/lib/deployments";
 
 export default function HomePage() {
   return (
@@ -22,7 +23,7 @@ export default function HomePage() {
                 <td>{c.name}</td><td>{c.id}</td>
                 <td>{f.create ? "Yes" : "No"}</td>
                 <td>{f.deposit && f.redeem ? "Yes" : "No"}</td>
-                <td>{f.swap ? "Yes" : "Not yet"}</td>
+                <td>{f.swap && getDeployment(c.id).swapAdapters.length > 0 ? "Yes" : "Not enabled"}</td>
               </tr>
             );
           })}

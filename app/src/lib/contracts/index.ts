@@ -4,7 +4,6 @@ export type { ChainDeployment, DenominationAsset, SwapAdapter } from "@/lib/depl
 export {
   anyForkDeployment,
   errorMessage,
-  listPortfolios,
   useCreatePortfolio,
   useDeployment,
   useDenominationCheck,
@@ -12,6 +11,20 @@ export {
   useDeposit,
   useRedeem,
   useTokenBalance,
-  useVault,
+  useDepositQuote,
+  useSwap,
+  useTokenInfo,
+  useMyPortfolios,
+  usePortfolio,
+  useValuation,
 } from "./hooks";
-export type { CreatePortfolioInput, CreatePortfolioResult, DenominationStatus, DeploymentHealth } from "./hooks";
+export type { MyPortfolio, CreatePortfolioInput, CreatePortfolioResult, DenominationStatus, DeploymentHealth } from "./hooks";
+export type { PreparedSwap, SwapFlowResult } from "./swap";
+export type { PrepareSwapInput } from "./hooks";
+export { readPortfolio, readValuation, previewInKindRedemption } from "./portfolio";
+export type { Holding, PortfolioData, TokenInfo, Valuation } from "./portfolio";
+export type { DepositFlowResult, RedeemFlowResult } from "./flows";
+export type { Redemption } from "./calls";
+export { minSharesWithSlippage, expectedShares } from "./calls";
+export { addSaved, loadSavedVaults, removeSaved, storeSavedVaults } from "./listing";
+export type { SavedVaults } from "./listing";

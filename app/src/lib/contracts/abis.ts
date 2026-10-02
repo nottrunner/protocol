@@ -32,6 +32,7 @@ export const comptrollerAbi = parseAbi([
 export const valueInterpreterAbi = parseAbi([
   "function isSupportedPrimitiveAsset(address _asset) view returns (bool)",
   "function isSupportedAsset(address _asset) view returns (bool)",
+  "function calcCanonicalAssetValue(address _baseAsset, uint256 _amount, address _quoteAsset) returns (uint256 value_)",
 ]);
 
 /** FundValueCalculatorRouter (persistent). All calc* are non-view: call with eth_call. */
@@ -60,4 +61,18 @@ export const erc20Abi = parseAbi([
   "function balanceOf(address) view returns (uint256)",
   "function allowance(address owner, address spender) view returns (uint256)",
   "function approve(address spender, uint256 amount) returns (bool)",
+]);
+
+/** Uniswap V3 QuoterV2: not a view fn (it reverts internally to read results), so use eth_call / simulateContract. */
+export const quoterV2Abi = parseAbi([
+  "function quoteExactInput(bytes path, uint256 amountIn) returns (uint256 amountOut, uint160[] sqrtPriceX96AfterList, uint32[] initializedTicksCrossedList, uint256 gasEstimate)",
+]);
+
+export const integrationManagerAbi = parseAbi([
+  "event CallOnIntegrationExecutedForFund(address indexed comptrollerProxy, address caller, address indexed adapter, bytes4 indexed selector, bytes integrationData, address[] incomingAssets, uint256[] incomingAssetAmounts, address[] spendAssets, uint256[] spendAssetAmounts)",
+]);
+
+/** ParaSwap (Velora) Augustus V6 generic exact-in entrypoint, used to decode the calldata the Velora API returns. */
+export const augustusV6Abi = parseAbi([
+  "function swapExactAmountIn(address executor, (address srcToken, address destToken, uint256 fromAmount, uint256 toAmount, uint256 quotedAmount, bytes32 metadata, address beneficiary) swapData, uint256 partnerAndFee, bytes permit, bytes executorData) payable returns (uint256 receivedAmount, uint256 paraswapShare, uint256 partnerShare)",
 ]);

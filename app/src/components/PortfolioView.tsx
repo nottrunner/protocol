@@ -1,162 +1,118 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { isAddress } from "viem";
 import { useAccount } from "wagmi";
-import { explorerUrl, isSupportedChainId } from "@/config/chains";
-import { formatAmount, safeParseUnits, shortAddress } from "@/lib/format";
-import { useDeposit, useRedeem, useTokenBalance, useVault } from "@/lib/contracts";
+import { explorerUrl, getChain } from "@/config/chains";
+import { formatAmount, shortAddress } from "@/lib/format";
+import { addSaved, loadSavedVaults, storeSavedVaults, usePortfolio, useValuation } from "@/lib/contracts";
+import { DeploymentNotices } from "./DeploymentNotices";
+import { DepositCard } from "./DepositCard";
 import { Notice } from "./Notice";
+import { RedeemCard } from "./RedeemCard";
+import { SwapCard } from "./SwapCard";
 import { useSelectedChain } from "./useSelectedChain";
+import { WalletChainGate } from "./WalletChainGate";
 
-export function PortfolioView() {
-  const router = useRouter();
-  const params = useSearchParams();
-  const { chainId, chain, setReadChainId, can, isSupported } = useSelectedChain();
-  const { isConnected } = useAccount();
+/** Portfolio page body for /portfolio/<chain>/<vault>. All reads use the URL's chain, so a reload renders the same page. */
+export function PortfolioView({ chainId, vault }: { chainId: number; vault: string }) {
+  const { isConnected, chainId: walletChainId } = useAccount();
+  const { setReadChainId, can } = useSelectedChain();
+  const chain = getChain(chainId);
+  const p = usePortfolio(chainId, vault);
+  const valuation = useValuation(chainId, p.data);
 
-  const qsChain = Number(params.get("chain"));
-  const qsVault = params.get("vault") ?? "";
-  const [input, setInput] = useState(qsVault);
-
-  // honour ?chain= for read-only deep links when no wallet is connected
   useEffect(() => {
-    if (!isConnected && isSupportedChainId(qsChain)) setReadChainId(qsChain);
-  }, [qsChain, isConnected, setReadChainId]);
+    setReadChainId(chainId);
+  }, [chainId, setReadChainId]);
 
-  const vault = useVault(chainId, qsVault || undefined);
+  // Remember opened vaults so they show up under "My portfolios" (paste fallback / vaults created elsewhere).
+  useEffect(() => {
+    if (p.data) storeSavedVaults(addSaved(loadSavedVaults(), chainId, p.data.vault));
+  }, [p.data, chainId]);
+
+  if (!isAddress(vault)) return <Notice kind="error">Invalid vault address.</Notice>;
+  const walletOnChain = !isConnected || walletChainId === chainId;
+  const d = p.data;
+  const v = valuation.data;
+  const dd = d?.denomination.decimals ?? 18;
 
   return (
     <>
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          router.push(`/portfolio?chain=${chainId}&vault=${input.trim()}`);
-        }}
-      >
-        <input className="grow" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Vault (VaultProxy) address 0x…" spellCheck={false} />
-        <button className="btn" type="submit" disabled={!isAddress(input.trim())}>Load</button>
-      </form>
-      <p className="muted small">Network: <strong>{chain?.name ?? "Unsupported"}</strong>. Portfolio listing by wallet needs an indexer (TODO).</p>
-
-      {!isSupported && <Notice kind="warn">Switch to a supported network.</Notice>}
-      {qsVault && !isAddress(qsVault) && <Notice kind="error">Invalid vault address.</Notice>}
-      {vault.valid && vault.isLoading && <p className="muted">Loading…</p>}
-      {vault.valid && !vault.isLoading && vault.isError && (
+      <p className="muted small">Network: <strong>{chain?.name}</strong></p>
+      <DeploymentNotices chainId={chainId} />
+      <WalletChainGate chainId={chainId} />
+      {p.isLoading && <p className="muted">Loading…</p>}
+      {!p.isLoading && p.isError && (
         <Notice kind="error">No vault found at this address on {chain?.name}. Check the address and network.</Notice>
       )}
 
-      {vault.valid && !vault.isLoading && !vault.isError && (
-        <div className="card">
-          <h2>{vault.name ?? "Portfolio"} <span className="muted">({vault.symbol})</span></h2>
+      {d && (
+        <div className="card" data-testid="portfolio">
+          <h2>
+            <span data-testid="portfolio-name">{d.name}</span> <span className="muted">(<span data-testid="portfolio-symbol">{d.symbol}</span>)</span>
+          </h2>
           <dl className="dl">
             <dt>Vault</dt>
-            <dd>{explorerUrl(chainId, `/address/${qsVault}`) ? <a href={explorerUrl(chainId, `/address/${qsVault}`)} target="_blank" rel="noreferrer">{shortAddress(qsVault)}</a> : shortAddress(qsVault)}</dd>
-            <dt>Owner</dt><dd>{vault.owner ? shortAddress(vault.owner) : "-"}</dd>
-            <dt>Total shares</dt><dd>{formatAmount(vault.totalSupply, 18)}</dd>
-            <dt>Your shares</dt><dd>{isConnected ? formatAmount(vault.shareBalance, 18) : "Connect wallet"}</dd>
-            <dt>Denomination asset</dt><dd>{vault.denominationAsset ? shortAddress(vault.denominationAsset) : "-"}</dd>
-            <dt>Tracked assets</dt>
-            <dd>{vault.trackedAssets.length ? vault.trackedAssets.map((a) => shortAddress(a)).join(", ") : "None"}</dd>
+            <dd data-testid="portfolio-vault">
+              {explorerUrl(chainId, `/address/${d.vault}`)
+                ? <a href={explorerUrl(chainId, `/address/${d.vault}`)} target="_blank" rel="noreferrer">{d.vault}</a>
+                : d.vault}
+            </dd>
+            <dt>Comptroller</dt><dd data-testid="portfolio-comptroller">{d.comptroller}</dd>
+            <dt>Owner</dt><dd data-testid="portfolio-owner">{d.owner}</dd>
+            <dt>Denomination</dt><dd data-testid="portfolio-denomination">{d.denomination.symbol} ({shortAddress(d.denomination.address)})</dd>
+            <dt>Total shares</dt><dd data-testid="portfolio-total-shares">{formatAmount(d.totalSupply, 18)}</dd>
+            <dt>Your shares</dt>
+            <dd data-testid="portfolio-your-shares">{d.account ? formatAmount(d.account.shares, 18) : "Connect wallet"}</dd>
+            <dt>Share price</dt>
+            <dd data-testid="portfolio-share-price">
+              {valuation.isLoading && "…"}
+              {v && (v.netSharePrice ?? v.grossSharePrice) !== undefined
+                ? `${formatAmount((v.netSharePrice ?? v.grossSharePrice) as bigint, dd)} ${d.denomination.symbol}${v.netSharePrice === undefined ? " (gross)" : ""}`
+                : !valuation.isLoading && "unavailable"}
+            </dd>
+            <dt>NAV</dt>
+            <dd data-testid="portfolio-nav">
+              {valuation.isLoading && "…"}
+              {v && (v.nav ?? v.gav) !== undefined
+                ? `${formatAmount((v.nav ?? v.gav) as bigint, dd)} ${d.denomination.symbol}${v.nav === undefined ? " (GAV)" : ""}`
+                : !valuation.isLoading && "unavailable"}
+            </dd>
           </dl>
-          {/* TODO(valuation): NAV / GAV / share price (FundValueCalculatorRouter) once its address is configured per chain. */}
+          {v && v.errors.length > 0 && <Notice kind="warn">{v.errors.join(" · ")}</Notice>}
+
+          <h3>Holdings</h3>
+          <table className="table" data-testid="holdings">
+            <thead><tr><th>Asset</th><th>Balance</th><th>Value ({d.denomination.symbol})</th></tr></thead>
+            <tbody>
+              {d.holdings.length === 0 && <tr><td colSpan={3}>No tracked assets</td></tr>}
+              {d.holdings.map((h) => (
+                <tr key={h.address} data-testid={`holding-${h.symbol}`}>
+                  <td>{h.symbol} <span className="muted small">{shortAddress(h.address)}</span></td>
+                  <td data-testid={`holding-balance-${h.symbol}`}>{formatAmount(h.balance, h.decimals)}</td>
+                  <td>{v?.assetValues[h.address.toLowerCase()] !== undefined ? formatAmount(v.assetValues[h.address.toLowerCase()], dd) : "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
           <div className="grid">
             {can("deposit") ? (
-              <DepositCard chainId={chainId} comptroller={vault.comptroller} asset={vault.denominationAsset} onDone={vault.refetch} />
+              <DepositCard portfolio={d} disabled={!walletOnChain} onDone={() => { void p.refetch(); void valuation.refetch(); }} />
             ) : (
               <Notice kind="info">Deposits are not enabled on {chain?.name}.</Notice>
             )}
             {can("redeem") ? (
-              <RedeemCard chainId={chainId} comptroller={vault.comptroller} shares={vault.shareBalance} onDone={vault.refetch} />
+              <RedeemCard portfolio={d} disabled={!walletOnChain} onDone={() => { void p.refetch(); void valuation.refetch(); }} />
             ) : (
               <Notice kind="info">Redemptions are not enabled on {chain?.name}.</Notice>
             )}
           </div>
 
-          {can("swap") && (
-            <div className="card inner">
-              <h3>Swap</h3>
-              <p className="muted">TODO(swap): manager-only trade UI via IntegrationManager adapters.</p>
-            </div>
-          )}
-          {/* Swap UI is intentionally not rendered when the flag is off (e.g. Robinhood Chain phase 1). */}
+          <SwapCard portfolio={d} disabled={!walletOnChain} onDone={() => { void p.refetch(); void valuation.refetch(); }} />
         </div>
       )}
     </>
-  );
-}
-
-function DepositCard(props: { chainId: number; comptroller?: `0x${string}`; asset?: `0x${string}`; onDone: () => unknown }) {
-  const { isConnected } = useAccount();
-  const { deposit, pending } = useDeposit(props.chainId, props.comptroller, props.asset);
-  const token = useTokenBalance(props.chainId, props.asset);
-  const [amount, setAmount] = useState("");
-  const [msg, setMsg] = useState<{ kind: "ok" | "error"; text: string }>();
-  const decimals = token.decimals ?? 18;
-  const parsed = safeParseUnits(amount, decimals);
-
-  return (
-    <div className="card inner">
-      <h3>Deposit</h3>
-      <p className="muted small">Balance: {formatAmount(token.balance, decimals)} {token.symbol ?? ""}</p>
-      <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Amount" inputMode="decimal" />
-      <button
-        className="btn"
-        disabled={!isConnected || !parsed || parsed === BigInt(0) || pending || !props.comptroller || token.decimals === undefined}
-        onClick={async () => {
-          setMsg(undefined);
-          try {
-            await deposit(parsed as bigint);
-            setMsg({ kind: "ok", text: "Deposit confirmed." });
-            setAmount("");
-            await props.onDone();
-          } catch (err) {
-            setMsg({ kind: "error", text: err instanceof Error ? err.message.split("\n")[0] ?? "Failed" : "Failed" });
-          }
-        }}
-      >
-        {pending ? "Depositing…" : "Deposit"}
-      </button>
-      {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
-    </div>
-  );
-}
-
-function RedeemCard(props: { chainId: number; comptroller?: `0x${string}`; shares?: bigint; onDone: () => unknown }) {
-  const { isConnected } = useAccount();
-  const { redeem, pending } = useRedeem(props.chainId, props.comptroller);
-  const [amount, setAmount] = useState("");
-  const [msg, setMsg] = useState<{ kind: "ok" | "error"; text: string }>();
-  const parsed = safeParseUnits(amount, 18);
-  const tooMuch = parsed !== undefined && props.shares !== undefined && parsed > props.shares;
-
-  return (
-    <div className="card inner">
-      <h3>Redeem</h3>
-      <p className="muted small">Your shares: {formatAmount(props.shares, 18)}</p>
-      <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Shares" inputMode="decimal" />
-      {tooMuch && <span className="field-error">Exceeds your share balance</span>}
-      <button
-        className="btn"
-        disabled={!isConnected || !parsed || parsed === BigInt(0) || tooMuch || pending || !props.comptroller}
-        onClick={async () => {
-          setMsg(undefined);
-          try {
-            await redeem(parsed as bigint);
-            setMsg({ kind: "ok", text: "Redemption confirmed." });
-            setAmount("");
-            await props.onDone();
-          } catch (err) {
-            setMsg({ kind: "error", text: err instanceof Error ? err.message.split("\n")[0] ?? "Failed" : "Failed" });
-          }
-        }}
-      >
-        {pending ? "Redeeming…" : "Redeem in kind"}
-      </button>
-      {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
-    </div>
   );
 }
